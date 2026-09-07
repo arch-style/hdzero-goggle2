@@ -250,6 +250,11 @@ typedef struct {
     // resetting it, so returning to video skips DM6302_init(). Costs power:
     // the tuner stays alive for as long as the menu is up.
     uint8_t fast_menu;
+    // 1=leave the display on whatever timing the video was using when the
+    // menu opens, instead of reconfiguring it to 1080p50. Saves the ~1.1s
+    // dispw call in both directions, at the cost of the menu being cropped
+    // whenever the video is not already 1080p.
+    uint8_t keep_display;
 } ease_use_t;
 
 typedef enum {

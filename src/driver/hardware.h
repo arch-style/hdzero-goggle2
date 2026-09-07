@@ -90,6 +90,9 @@ void HDZero_Standby();
 void Source_HDMI_in();
 void Source_AV(uint8_t sel); // 0=AV in, 1=AV module
 void Display_UI_init();
+// True once dispw has actually been run, so callers can tell a real display
+// state from the assumed boot one.
+bool vdpo_timing_applied(void);
 void Display_UI();
 void Display_720P90(int mode);
 void Display_720P60_50(int mode, uint8_t is_43);

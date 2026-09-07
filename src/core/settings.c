@@ -93,6 +93,7 @@ const setting_t g_setting_defaults = {
     .ease = {
         .no_dial = 0,
         .fast_menu = 0,
+        .keep_display = 0,
     },
     .osd = {
         .orbit = 2,
@@ -510,6 +511,10 @@ void settings_load(void) {
     //  keep the tuner alive while the menu is open
     g_setting.ease.fast_menu = fs_file_exists(FAST_MENU_FILE);
     LOGI("fast_menu: %s", g_setting.ease.fast_menu ? "on" : "off");
+
+    //  do not reconfigure the display when opening the menu
+    g_setting.ease.keep_display = fs_file_exists(KEEP_DISPLAY_FILE);
+    LOGI("keep_display: %s", g_setting.ease.keep_display ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);

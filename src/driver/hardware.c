@@ -605,29 +605,43 @@ void OLED_ON(int bON) {
 // this keeps that record and adds the guard. The first call always execs,
 // because the boot-time value of vdpo_tmg is an assumption, not an
 // observation.
+// False until dispw has actually run once, because the boot value of
+// g_hw_stat.vdpo_tmg is an assumption rather than an observation.
+static bool vdpo_applied_once = false;
+
+bool vdpo_timing_applied(void) {
+    return vdpo_applied_once;
+}
+
 static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
     // g_hw_stat.vdpo_tmg is the state of record: the HDMI-in paths that still
     // exec dispw directly assign it too, so reading it here cannot go stale.
-    // Its boot value is an assumption though, so always exec the first time.
-    static bool applied_once = false;
     char buf[64];
 
-    if (applied_once && g_hw_stat.vdpo_tmg == tmg) {
+    if (vdpo_applied_once && g_hw_stat.vdpo_tmg == tmg) {
         LOGI("vdpo: already %s", mode);
         return;
     }
 
     snprintf(buf, sizeof(buf), "dispw -s vdpo %s", mode);
     system_exec(buf);
-    applied_once = true;
+    vdpo_applied_once = true;
     g_hw_stat.vdpo_tmg = tmg;
 }
 
 void Display_UI_init() {
+    // dispw is the single most expensive thing on the menu/video path, 1.1s
+    // measured, and reconfiguring for the menu is the only reason it runs.
+    // With keep_display the panel stays on the timing the video was using;
+    // the menu is laid out for 1080p, so it gets cropped at anything less.
+    // The boot call still configures the display, since nothing has yet.
+    bool reconfigure = !g_setting.ease.keep_display || !vdpo_applied_once;
+
     g_hw_stat.source_mode = SOURCE_MODE_UI;
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
+    if (reconfigure)
+        vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
 
     if (GOGGLE_VER_2)
         system_exec("aww 0x0300b340 0x00000008");
@@ -639,7 +653,11 @@ void Display_UI_init() {
     I2C_Write(ADDR_FPGA, 0x80, 0x00);
     I2C_Write(ADDR_FPGA, 0x84, 0x11);
 
-    OLED_SetTMG(0);
+    // The panel timing has to follow the pipeline timing, so it moves only
+    // when the pipeline did.
+    if (reconfigure)
+        OLED_SetTMG(0);
+
     system_exec("aww 0x0300b084 0x00002aaa"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
 
     if (GOGGLE_VER_2)

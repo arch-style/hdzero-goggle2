@@ -46,7 +46,10 @@ void app_switch_to_menu() {
     LOGI("switch mark: dvr stopped");
 
     Display_UI();
-    lvgl_switch_to_1080p();
+    // Match the canvas to the pipeline: with keep_display the panel is still
+    // on the video timing, so drawing the menu at 1080p would not line up.
+    if (!g_setting.ease.keep_display || !vdpo_timing_applied())
+        lvgl_switch_to_1080p();
     LOGI("switch mark: display to UI");
     exit_tune_channel();
     osd_show(false);
