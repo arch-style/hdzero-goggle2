@@ -16,14 +16,46 @@ static bool slot_usable(int slot) {
     return (ch >= 1) && (ch <= HDZERO_CHANNEL_NUM);
 }
 
-// Collects the usable slots, in slot order, into `list`.
+// Collects the usable slots, in slot order, into `list`, keeping only the
+// first occurrence of each channel. Without this, the same channel in two
+// slots makes favorites_step() hand back the channel it was already on, so
+// the dial stalls there and never reaches the rest of the list.
 static int favorites_collect(uint8_t *list) {
     int count = 0;
+
     for (int i = 0; i < FAVORITES_MAX; i++) {
-        if (slot_usable(i))
-            list[count++] = g_setting.favorites.channel[i];
+        if (!slot_usable(i))
+            continue;
+
+        uint8_t ch = g_setting.favorites.channel[i];
+        bool seen = false;
+
+        for (int j = 0; j < count; j++) {
+            if (list[j] == ch) {
+                seen = true;
+                break;
+            }
+        }
+
+        if (!seen)
+            list[count++] = ch;
     }
+
     return count;
+}
+
+bool favorites_slot_duplicate(int slot) {
+    if ((slot < 0) || (slot >= FAVORITES_MAX) || !slot_usable(slot))
+        return false;
+
+    uint8_t ch = g_setting.favorites.channel[slot];
+
+    for (int i = 0; i < slot; i++) {
+        if (slot_usable(i) && (g_setting.favorites.channel[i] == ch))
+            return true;
+    }
+
+    return false;
 }
 
 int favorites_valid_count(void) {

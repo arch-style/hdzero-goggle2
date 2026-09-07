@@ -26,7 +26,9 @@ enum {
 };
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
-static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
+// 12 rows of 54 rather than the usual 60: this page needs 11 selectable rows,
+// one more than any other page, and the Back row has to stay on screen.
+static lv_coord_t row_dsc[] = {54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_fav;
 static lv_obj_t *count_label;
@@ -59,6 +61,8 @@ static void slot_label_update(int slot) {
 
     if (editing_row == ROW_SLOT_FIRST + slot)
         snprintf(buf, sizeof(buf), "%s %d: #FFFF00 %s#", _lang("Slot"), slot + 1, value);
+    else if (favorites_slot_duplicate(slot))
+        snprintf(buf, sizeof(buf), "%s %d: %s #FF8000 (%s)#", _lang("Slot"), slot + 1, value, _lang("duplicate"));
     else
         snprintf(buf, sizeof(buf), "%s %d: %s", _lang("Slot"), slot + 1, value);
 
@@ -109,7 +113,7 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(page, 1053, 900);
     lv_obj_add_style(page, &style_subpage, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(page, 94, 0);
+    lv_obj_set_style_pad_top(page, 24, 0); // other pages use 94; we need the height
 
     lv_obj_t *section = lv_menu_section_create(page);
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
