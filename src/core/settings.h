@@ -246,6 +246,10 @@ typedef struct {
 
 typedef struct {
     uint8_t no_dial; // 1=disable turning channels under video mode
+    // 1=keep the HDZero tuner configured while the menu is open instead of
+    // resetting it, so returning to video skips DM6302_init(). Costs power:
+    // the tuner stays alive for as long as the menu is up.
+    uint8_t fast_menu;
 } ease_use_t;
 
 typedef enum {

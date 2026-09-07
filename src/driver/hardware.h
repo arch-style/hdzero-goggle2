@@ -60,6 +60,7 @@ typedef struct {
     // hdzero
     int hdz_bw; // 0=27MHz; 1=17MHz
     int hdzero_open;
+    int hdz_standby; // 1=baseband stopped but DM6302 still configured
     int m0_open;
 
     // av in
@@ -84,6 +85,7 @@ void hw_stat_init();
 void OLED_ON(int bON);
 void HDZero_open(int bw);
 void HDZero_Close();
+void HDZero_Standby();
 
 void Source_HDMI_in();
 void Source_AV(uint8_t sel); // 0=AV in, 1=AV module

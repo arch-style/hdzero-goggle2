@@ -9,6 +9,7 @@
 #include "core/input_device.h"
 #include "core/msp_displayport.h"
 #include "core/osd.h"
+#include "core/settings.h"
 #include "driver/dm5680.h"
 #include "driver/dm6302.h"
 #include "driver/hardware.h"
@@ -48,7 +49,12 @@ void app_switch_to_menu() {
     osd_show(false);
     g_bShowIMS = false;
     main_menu_show(true);
-    HDZero_Close();
+    // Resetting the tuner here is what makes coming back cost a full
+    // DM6302_init(). Standby skips that at the price of leaving it powered.
+    if (g_setting.ease.fast_menu)
+        HDZero_Standby();
+    else
+        HDZero_Close();
     g_sdcard_det_req = 1;
     if (g_source_info.source == SOURCE_HDMI_IN) // HDMI
         IT66121_init();

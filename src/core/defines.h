@@ -22,6 +22,7 @@
 
 #define SELF_TEST_FILE "/mnt/extsd/self_test.txt"
 #define NO_DIAL_FILE   "/mnt/extsd/no_dial.txt"
+#define FAST_MENU_FILE "/mnt/extsd/fast_menu.txt"
 #define APP_LOG_FILE   "/mnt/extsd/HDZGOGGLE.log"
 #define APP_BIN_FILE   "/mnt/extsd/HDZGOGGLE"
 #define DEVELOP_SCRIPT "/mnt/extsd/develop.sh"

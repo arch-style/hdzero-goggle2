@@ -567,6 +567,7 @@ void hw_stat_init() {
 
     g_hw_stat.hdz_bw = 0;
     g_hw_stat.hdzero_open = 0;
+    g_hw_stat.hdz_standby = 0;
     g_hw_stat.m0_open = 0;
 
     g_hw_stat.av_chid = 0;
@@ -784,6 +785,14 @@ void HDZero_open(int bw) {
         DM6302_init(0, g_hw_stat.hdz_bw);
         DM5680_SetBB(1);
         g_hw_stat.hdzero_open = 1;
+        g_hw_stat.hdz_standby = 0;
+    } else if (g_hw_stat.hdz_standby) {
+        // Back from standby: DM6302 kept its configuration and its M0 image,
+        // so only the baseband has to be restarted. This is the whole point
+        // of standby -- DM6302_init() is around a thousand SPI writes and a
+        // 100ms reset wait.
+        DM5680_SetBB(1);
+        g_hw_stat.hdz_standby = 0;
     }
     LOGI("HDZero: open");
 }
@@ -792,9 +801,27 @@ void HDZero_Close() {
     DM5680_SetBB(0);
     DM5680_ResetRF(0);
     g_hw_stat.hdzero_open = 0;
+    g_hw_stat.hdz_standby = 0;
     g_hw_stat.m0_open = 0;
 
     LOGI("HDZero: close");
+}
+
+// Like HDZero_Close(), but leaves DM6302 out of reset and configured so that
+// the next HDZero_open() is a single command instead of a full re-init. The
+// tuner stays powered meanwhile, so this is only for short absences such as
+// the menu being open -- never for sleep.
+void HDZero_Standby() {
+    if (g_hw_stat.hdzero_open == 0) {
+        // Nothing configured to hold on to; a close is all this can mean.
+        HDZero_Close();
+        return;
+    }
+
+    DM5680_SetBB(0);
+    g_hw_stat.hdz_standby = 1;
+
+    LOGI("HDZero: standby");
 }
 
 int HDZERO_detect() // return = 1: vtmg to V536 changed
