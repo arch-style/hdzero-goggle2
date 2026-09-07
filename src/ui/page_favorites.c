@@ -64,7 +64,7 @@ static void count_label_update(void) {
 static void title_label_update(void) {
     char buf[64];
 
-    snprintf(buf, sizeof(buf), "%s (%s)", _lang(FAVORITES_PAGE_NAME), _lang(favorites_source_name()));
+    snprintf(buf, sizeof(buf), "%s (%s):", _lang(FAVORITES_PAGE_NAME), _lang(favorites_source_name()));
     lv_label_set_text(title_label, buf);
     btn_group_set_sel(&btn_group_fav, favorites_list()->enable ? 1 : 0);
 }
@@ -148,8 +148,10 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     // together, so nothing below has to move.
     lv_obj_set_style_pad_top(section, 36, 0);
 
-    snprintf(buf, sizeof(buf), "%s:", _lang(FAVORITES_PAGE_NAME));
-    create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
+    // The heading is blank: the title row inside the grid carries the name,
+    // and it names the source too. Kept rather than dropped so the rows below
+    // stay exactly where they are.
+    create_text(NULL, section, false, " ", LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
     lv_obj_set_size(cont, 960, 894);
