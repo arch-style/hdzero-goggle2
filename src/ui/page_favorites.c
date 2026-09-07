@@ -26,7 +26,7 @@ enum {
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
-static btn_group_t btn_group_enable;
+static btn_group_t btn_group_fav;
 static lv_obj_t *slot_label[FAVORITES_MAX];
 static lv_obj_t *hint_label;
 
@@ -99,8 +99,8 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_btn_group_item(&btn_group_enable, cont, 2, _lang("Favorites"), _lang("Off"), _lang("On"), "", "", row++);
-    btn_group_set_sel(&btn_group_enable, g_setting.favorites.enable ? 1 : 0);
+    create_btn_group_item(&btn_group_fav, cont, 2, _lang("Favorites"), _lang("Off"), _lang("On"), "", "", row++);
+    btn_group_set_sel(&btn_group_fav, g_setting.favorites.enable ? 1 : 0);
 
     for (int i = 0; i < FAVORITES_MAX; i++)
         slot_label[i] = create_label_item(cont, "", 1, row++, 3);
@@ -165,8 +165,8 @@ static void on_roller(uint8_t key) {
 
 static void on_click(uint8_t key, int sel) {
     if (sel == ROW_ENABLE) {
-        btn_group_toggle_sel(&btn_group_enable);
-        g_setting.favorites.enable = btn_group_get_sel(&btn_group_enable) == 1;
+        btn_group_toggle_sel(&btn_group_fav);
+        g_setting.favorites.enable = btn_group_get_sel(&btn_group_fav) == 1;
         settings_put_bool("favorites", "enable", g_setting.favorites.enable);
         hint_label_update();
         return;
