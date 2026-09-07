@@ -627,11 +627,15 @@ void Display_UI_init() {
 
 void Display_UI() {
     pthread_mutex_lock(&hardware_mutex);
+    LOGI("switch mark: Display_UI start");
     OLED_display(0);
+    LOGI("switch mark: oled off");
 
     Display_UI_init();
+    LOGI("switch mark: vdpo reconfigured");
 
     OLED_display(1);
+    LOGI("switch mark: oled on");
     // OLED_reopen(0);
     pthread_mutex_unlock(&hardware_mutex);
 }
