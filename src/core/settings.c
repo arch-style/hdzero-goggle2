@@ -25,7 +25,8 @@ const setting_t g_setting_defaults = {
     },
     .favorites = {
         .enable = false,
-        .channel = {0, 0, 0, 0},
+        .count = 4,
+        .channel = {0, 0, 0, 0, 0, 0, 0, 0},
     },
     .fans = {
         .top_speed = 4,
@@ -360,6 +361,9 @@ void settings_load(void) {
 
     // favorites
     g_setting.favorites.enable = settings_get_bool("favorites", "enable", g_setting_defaults.favorites.enable);
+    g_setting.favorites.count = ini_getl("favorites", "count", g_setting_defaults.favorites.count, SETTING_INI);
+    if ((g_setting.favorites.count < 1) || (g_setting.favorites.count > FAVORITES_MAX))
+        g_setting.favorites.count = g_setting_defaults.favorites.count;
     for (int i = 0; i < FAVORITES_MAX; i++) {
         char fav_key[8];
         snprintf(fav_key, sizeof(fav_key), "ch%d", i + 1);

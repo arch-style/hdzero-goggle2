@@ -18,10 +18,12 @@ typedef struct {
     int channel;
 } setting_scan_t;
 
-#define FAVORITES_MAX 4
+#define FAVORITES_MAX 8
 
 typedef struct {
     bool enable;
+    // How many of the slots below are in use, 1..FAVORITES_MAX.
+    uint8_t count;
     // 0 marks an empty slot, otherwise a 1-based channel index within the
     // currently selected HDZero band.
     uint8_t channel[FAVORITES_MAX];

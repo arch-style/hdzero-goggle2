@@ -4,9 +4,15 @@
 
 // Slots pointing past the end of the current band (F1 while on the low band,
 // say) are skipped rather than clamped, so toggling the band back and forth
-// does not silently rewrite what the user registered.
+// does not silently rewrite what the user registered. Slots beyond the
+// configured count keep their value but take no part in tuning.
 static bool slot_usable(int slot) {
-    uint8_t ch = g_setting.favorites.channel[slot];
+    uint8_t ch;
+
+    if (slot >= g_setting.favorites.count)
+        return false;
+
+    ch = g_setting.favorites.channel[slot];
     return (ch >= 1) && (ch <= HDZERO_CHANNEL_NUM);
 }
 
