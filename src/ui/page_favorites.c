@@ -80,11 +80,14 @@ static void slot_label_update(int slot) {
 
 static void hint_label_update(void) {
     char buf[128];
+    int valid = favorites_valid_count();
 
     if (editing_row >= 0)
         snprintf(buf, sizeof(buf), "%s", _lang("Turn the dial to change, click to confirm"));
-    else if (g_setting.favorites.enable && (favorites_valid_count() < 2))
-        snprintf(buf, sizeof(buf), "#FF8000 %s#", _lang("Register at least 2 channels to use favorites"));
+    else if (g_setting.favorites.enable && (valid == 0))
+        snprintf(buf, sizeof(buf), "#FF8000 %s#", _lang("Register at least 1 channel to use favorites"));
+    else if (g_setting.favorites.enable && (valid == 1))
+        snprintf(buf, sizeof(buf), "%s", _lang("The dial stays locked to this channel"));
     else
         snprintf(buf, sizeof(buf), " ");
 

@@ -32,7 +32,7 @@ int favorites_valid_count(void) {
 }
 
 bool favorites_active(void) {
-    return g_setting.favorites.enable && (favorites_valid_count() >= 2);
+    return g_setting.favorites.enable && (favorites_valid_count() >= 1);
 }
 
 uint8_t favorites_get(int index) {

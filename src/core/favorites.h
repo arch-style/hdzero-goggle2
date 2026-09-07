@@ -17,8 +17,8 @@ extern "C" {
 int favorites_valid_count(void);
 
 // True when favorite tuning should take over the dial: the feature is enabled
-// and at least two slots are usable (a single entry would make the dial a
-// no-op, which reads as a broken goggle).
+// and at least one slot is usable. A single usable entry is deliberate rather
+// than degenerate -- it locks the dial to that one channel.
 bool favorites_active(void);
 
 // Channel of the `index`-th usable favorite (0-based), or 0 when out of range.
