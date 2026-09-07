@@ -10,11 +10,28 @@ extern "C" {
 #include "core/settings.h"
 
 // Favorite channels let the dial cycle through a short user-picked list
-// instead of walking the whole band. Slots hold channel indexes of the
-// currently selected HDZero band only; see setting_favorites_t.
+// instead of walking the whole band. HDZero and analog keep separate lists;
+// see setting_favorites_t.
+
+typedef enum {
+    FAVORITES_SOURCE_HDZERO = 0,
+    FAVORITES_SOURCE_ANALOG,
+} favorites_source_t;
+
+// Which list applies right now: analog only while watching the built-in
+// analog receiver, HDZero otherwise. Sources with no tuner of their own
+// (HDMI in, AV in) report HDZero, which is the list they will come back to.
+favorites_source_t favorites_source(void);
+
+// The list favorites_source() names, and the highest channel it may hold.
+setting_favorites_list_t *favorites_list(void);
+uint8_t favorites_channel_max(void);
+
+// Name of the current source, for the settings page.
+const char *favorites_source_name(void);
 
 // Number of distinct channels held by the slots that are in use and valid for
-// the current band. Repeats of an earlier slot are not counted.
+// the current source. Repeats of an earlier slot are not counted.
 int favorites_valid_count(void);
 
 // True when this slot repeats a channel already held by an earlier in-use
@@ -22,12 +39,10 @@ int favorites_valid_count(void);
 bool favorites_slot_duplicate(int slot);
 
 // True when favorite tuning should take over the dial: the feature is enabled
-// and at least one slot is usable. A single usable entry is deliberate rather
-// than degenerate -- it locks the dial to that one channel.
+// for the current source and at least one slot is usable. A single usable
+// entry is deliberate rather than degenerate -- it locks the dial to that one
+// channel.
 bool favorites_active(void);
-
-// Channel of the `index`-th usable favorite (0-based), or 0 when out of range.
-uint8_t favorites_get(int index);
 
 // Neighbour of `channel` in the favorite list, wrapping around.
 // dir > 0 walks up the list, dir < 0 walks down. When `channel` is not itself

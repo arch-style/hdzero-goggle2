@@ -24,9 +24,20 @@ typedef struct {
     bool enable;
     // How many of the slots below are in use, 1..FAVORITES_MAX.
     uint8_t count;
-    // 0 marks an empty slot, otherwise a 1-based channel index within the
-    // currently selected HDZero band.
+    // 0 marks an empty slot, otherwise a 1-based channel index. What the index
+    // means depends on which list this is: a channel within the currently
+    // selected band for HDZero, one of the 48 analog channels for analog.
     uint8_t channel[FAVORITES_MAX];
+} setting_favorites_list_t;
+
+#define FAVORITES_INI_HDZERO "favorites"
+#define FAVORITES_INI_ANALOG "favorites_analog"
+
+typedef struct {
+    // Kept apart because the same index means different channels on each
+    // source: 4 is R4 on HDZero and A4 on analog.
+    setting_favorites_list_t hdzero;
+    setting_favorites_list_t analog;
 } setting_favorites_t;
 
 typedef enum {

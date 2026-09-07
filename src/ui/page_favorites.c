@@ -40,24 +40,37 @@ static int editing_row = -1;
 
 static void count_label_update(void) {
     char buf[64];
+    uint8_t count = favorites_list()->count;
 
     if (editing_row == ROW_COUNT_SEL)
-        snprintf(buf, sizeof(buf), "%s: #FFFF00 %d#", _lang("Number of channels"), g_setting.favorites.count);
+        snprintf(buf, sizeof(buf), "%s: #FFFF00 %d#", _lang("Number of channels"), count);
     else
-        snprintf(buf, sizeof(buf), "%s: %d", _lang("Number of channels"), g_setting.favorites.count);
+        snprintf(buf, sizeof(buf), "%s: %d", _lang("Number of channels"), count);
 
     lv_label_set_text(count_label, buf);
 }
 
+// The page always edits the list for whatever source is being watched, so say
+// which one that is.
+static void enable_label_update(void) {
+    char buf[64];
+
+    snprintf(buf, sizeof(buf), "%s (%s)", _lang("Favorites"), _lang(favorites_source_name()));
+    lv_label_set_text(btn_group_fav.label, buf);
+    btn_group_set_sel(&btn_group_fav, favorites_list()->enable ? 1 : 0);
+}
+
 static void slot_label_update(int slot) {
     char buf[64];
-    uint8_t ch = g_setting.favorites.channel[slot];
+    setting_favorites_list_t *list = favorites_list();
+    bool is_hdzero = (favorites_source() == FAVORITES_SOURCE_HDZERO);
+    uint8_t ch = list->channel[slot];
     const char *value;
 
     if (ch == 0)
         value = _lang("Empty");
     else
-        value = channel2str(1, g_setting.source.hdzero_band, ch);
+        value = channel2str(is_hdzero, g_setting.source.hdzero_band, ch);
 
     if (editing_row == ROW_SLOT_FIRST + slot)
         snprintf(buf, sizeof(buf), "%s %d: #FFFF00 %s#", _lang("Slot"), slot + 1, value);
@@ -70,7 +83,7 @@ static void slot_label_update(int slot) {
 
     // Slots past the configured count stay on screen but greyed out, and the
     // dial skips over them.
-    bool in_use = (slot < g_setting.favorites.count);
+    bool in_use = (slot < list->count);
     lv_obj_t *panel = pp_favorites.p_arr.panel[ROW_SLOT_FIRST + slot];
 
     if (in_use) {
@@ -86,11 +99,13 @@ static void hint_label_update(void) {
     char buf[128];
     int valid = favorites_valid_count();
 
+    bool enabled = favorites_list()->enable;
+
     if (editing_row >= 0)
         snprintf(buf, sizeof(buf), "%s", _lang("Turn the dial to change, click to confirm"));
-    else if (g_setting.favorites.enable && (valid == 0))
+    else if (enabled && (valid == 0))
         snprintf(buf, sizeof(buf), "#FF8000 %s#", _lang("Register at least 1 channel to use favorites"));
-    else if (g_setting.favorites.enable && (valid == 1))
+    else if (enabled && (valid == 1))
         snprintf(buf, sizeof(buf), "%s", _lang("The dial stays locked to this channel"));
     else
         snprintf(buf, sizeof(buf), " ");
@@ -99,6 +114,7 @@ static void hint_label_update(void) {
 }
 
 static void page_favorites_update(void) {
+    enable_label_update();
     count_label_update();
     for (int i = 0; i < FAVORITES_MAX; i++)
         slot_label_update(i);
@@ -135,7 +151,6 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_select_item(arr, cont);
 
     create_btn_group_item(&btn_group_fav, cont, 2, _lang("Favorites"), _lang("Off"), _lang("On"), "", "", row++);
-    btn_group_set_sel(&btn_group_fav, g_setting.favorites.enable ? 1 : 0);
 
     count_label = create_label_item(cont, "", 1, row++, 3);
 
@@ -176,15 +191,17 @@ static void on_roller(uint8_t key) {
     if (g_app_state != APP_STATE_SUBMENU_ITEM_FOCUSED)
         return;
 
+    setting_favorites_list_t *list = favorites_list();
+
     if (editing_row == ROW_COUNT_SEL) {
-        uint8_t count = g_setting.favorites.count;
+        uint8_t count = list->count;
 
         if (key == DIAL_KEY_UP)
             count = (count >= FAVORITES_MAX) ? 1 : count + 1;
         else if (key == DIAL_KEY_DOWN)
             count = (count <= 1) ? FAVORITES_MAX : count - 1;
 
-        g_setting.favorites.count = count;
+        list->count = count;
         page_favorites_update();
         return;
     }
@@ -195,38 +212,47 @@ static void on_roller(uint8_t key) {
     int slot = editing_row - ROW_SLOT_FIRST;
 
     // 0 is the "empty" entry, so the value wraps over [0, channel count].
-    uint8_t ch = g_setting.favorites.channel[slot];
-    uint8_t max = HDZERO_CHANNEL_NUM;
+    uint8_t ch = list->channel[slot];
+    uint8_t max = favorites_channel_max();
 
     if (key == DIAL_KEY_UP)
         ch = (ch >= max) ? 0 : ch + 1;
     else if (key == DIAL_KEY_DOWN)
         ch = (ch == 0) ? max : ch - 1;
 
-    g_setting.favorites.channel[slot] = ch;
+    list->channel[slot] = ch;
     slot_label_update(slot);
 }
 
+// Which ini section the list on screen belongs to.
+static const char *favorites_ini_section(void) {
+    return (favorites_source() == FAVORITES_SOURCE_ANALOG) ? FAVORITES_INI_ANALOG : FAVORITES_INI_HDZERO;
+}
+
 static void favorites_save_row(int row) {
+    const setting_favorites_list_t *list = favorites_list();
+    const char *section = favorites_ini_section();
     char key[8];
 
     if (row == ROW_COUNT_SEL) {
-        ini_putl("favorites", "count", g_setting.favorites.count, SETTING_INI);
-        LOGI("favorites: count = %d", g_setting.favorites.count);
+        ini_putl(section, "count", list->count, SETTING_INI);
+        LOGI("favorites(%s): count = %d", section, list->count);
         return;
     }
 
     int slot = row - ROW_SLOT_FIRST;
     snprintf(key, sizeof(key), "ch%d", slot + 1);
-    ini_putl("favorites", key, g_setting.favorites.channel[slot], SETTING_INI);
-    LOGI("favorites: slot %d = channel %d", slot + 1, g_setting.favorites.channel[slot]);
+    ini_putl(section, key, list->channel[slot], SETTING_INI);
+    LOGI("favorites(%s): slot %d = channel %d", section, slot + 1, list->channel[slot]);
 }
 
 static void on_click(uint8_t key, int sel) {
     if (sel == ROW_ENABLE) {
+        setting_favorites_list_t *list = favorites_list();
+
         btn_group_toggle_sel(&btn_group_fav);
-        g_setting.favorites.enable = btn_group_get_sel(&btn_group_fav) == 1;
-        settings_put_bool("favorites", "enable", g_setting.favorites.enable);
+        list->enable = btn_group_get_sel(&btn_group_fav) == 1;
+        settings_put_bool((char *)favorites_ini_section(), "enable", list->enable);
         hint_label_update();
         return;
     }

@@ -119,8 +119,10 @@ void tune_channel(uint8_t action) {
     } else
         return;
 
-    // With favorites on, the dial cycles the registered HDZero channels only.
-    bool use_favorites = (g_source_info.source == SOURCE_HDZERO) && favorites_active();
+    // With favorites on, the dial cycles the registered channels only.
+    // favorites_active() picks the list matching the source we are tuning;
+    // any source that reaches here has one.
+    bool use_favorites = favorites_active();
 
     switch (action) {
     case DIAL_KEY_UP: // Tune up

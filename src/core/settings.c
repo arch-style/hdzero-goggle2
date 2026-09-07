@@ -24,9 +24,16 @@ const setting_t g_setting_defaults = {
         .channel = 1,
     },
     .favorites = {
-        .enable = false,
-        .count = 4,
-        .channel = {0, 0, 0, 0, 0, 0, 0, 0},
+        .hdzero = {
+            .enable = false,
+            .count = 4,
+            .channel = {0, 0, 0, 0, 0, 0, 0, 0},
+        },
+        .analog = {
+            .enable = false,
+            .count = 4,
+            .channel = {0, 0, 0, 0, 0, 0, 0, 0},
+        },
     },
     .fans = {
         .top_speed = 4,
@@ -238,6 +245,20 @@ const setting_t g_setting_defaults = {
     },
 };
 
+static void settings_load_favorites(setting_favorites_list_t *list, const setting_favorites_list_t *defaults, const char *section) {
+    list->enable = settings_get_bool((char *)section, "enable", defaults->enable);
+
+    list->count = ini_getl(section, "count", defaults->count, SETTING_INI);
+    if ((list->count < 1) || (list->count > FAVORITES_MAX))
+        list->count = defaults->count;
+
+    for (int i = 0; i < FAVORITES_MAX; i++) {
+        char key[8];
+        snprintf(key, sizeof(key), "ch%d", i + 1);
+        list->channel[i] = ini_getl(section, key, defaults->channel[i], SETTING_INI);
+    }
+}
+
 int settings_put_osd_element_shown(bool show, char *config_name) {
     char setting_key[128];
 
@@ -360,15 +381,10 @@ void settings_load(void) {
     }
 
     // favorites
-    g_setting.favorites.enable = settings_get_bool("favorites", "enable", g_setting_defaults.favorites.enable);
-    g_setting.favorites.count = ini_getl("favorites", "count", g_setting_defaults.favorites.count, SETTING_INI);
-    if ((g_setting.favorites.count < 1) || (g_setting.favorites.count > FAVORITES_MAX))
-        g_setting.favorites.count = g_setting_defaults.favorites.count;
-    for (int i = 0; i < FAVORITES_MAX; i++) {
-        char fav_key[8];
-        snprintf(fav_key, sizeof(fav_key), "ch%d", i + 1);
-        g_setting.favorites.channel[i] = ini_getl("favorites", fav_key, g_setting_defaults.favorites.channel[i], SETTING_INI);
-    }
+    // The HDZero list keeps the original [favorites] section so lists
+    // registered before analog support survive the upgrade.
+    settings_load_favorites(&g_setting.favorites.hdzero, &g_setting_defaults.favorites.hdzero, FAVORITES_INI_HDZERO);
+    settings_load_favorites(&g_setting.favorites.analog, &g_setting_defaults.favorites.analog, FAVORITES_INI_ANALOG);
 
     // autoscan
     g_setting.autoscan.status = ini_getl("autoscan", "status", g_setting_defaults.autoscan.status, SETTING_INI);
