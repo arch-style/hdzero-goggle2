@@ -82,10 +82,14 @@ static page_pack_t *page_packs[] = {
 static lv_coord_t menu_entry_pad_ver(void) {
     const lv_coord_t theme_pad = 11;
     const lv_coord_t line_h = lv_font_montserrat_24.line_height;
-    lv_coord_t pad = ((MENU_SIDEBAR_HEIGHT / (lv_coord_t)PAGE_COUNT) - line_h) / 2;
+    // Worst case for the gap the flex layout puts between entries. The exact
+    // value is not readable from here, but the sidebar overflowing at 20
+    // entries of 49px and fitting at 19 bounds it to 0..2.
+    const lv_coord_t gap = 2;
+    const lv_coord_t entries = (lv_coord_t)PAGE_COUNT;
 
-    // Leave a little slack: the flex layout may add a gap of its own.
-    pad -= 2;
+    lv_coord_t entry_h = (MENU_SIDEBAR_HEIGHT - gap * (entries - 1)) / entries;
+    lv_coord_t pad = (entry_h - line_h) / 2;
 
     if (pad < 2)
         pad = 2;
