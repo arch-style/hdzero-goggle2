@@ -27,6 +27,7 @@
 #include "core/app_state.h"
 #include "core/dvr.h"
 #include "core/elrs.h"
+#include "core/favorites.h"
 #include "core/settings.h"
 #include "core/sleep_mode.h"
 #include "driver/dm6302.h"
@@ -118,16 +119,23 @@ void tune_channel(uint8_t action) {
     } else
         return;
 
+    // With favorites on, the dial cycles the registered HDZero channels only.
+    bool use_favorites = (g_source_info.source == SOURCE_HDZERO) && favorites_active();
+
     switch (action) {
     case DIAL_KEY_UP: // Tune up
-        if (channel >= channel_num)
+        if (use_favorites)
+            channel = favorites_step(channel, 1);
+        else if (channel >= channel_num)
             channel = 1;
         else
             channel++;
         break;
 
     case DIAL_KEY_DOWN: // Tune down
-        if (channel == 1)
+        if (use_favorites)
+            channel = favorites_step(channel, -1);
+        else if (channel == 1)
             channel = channel_num;
         else
             channel--;

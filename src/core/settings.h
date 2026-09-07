@@ -18,6 +18,15 @@ typedef struct {
     int channel;
 } setting_scan_t;
 
+#define FAVORITES_MAX 4
+
+typedef struct {
+    bool enable;
+    // 0 marks an empty slot, otherwise a 1-based channel index within the
+    // currently selected HDZero band.
+    uint8_t channel[FAVORITES_MAX];
+} setting_favorites_t;
+
 typedef enum {
     SETTING_AUTOSCAN_STATUS_ON = 0,
     SETTING_AUTOSCAN_STATUS_LAST = 1,
@@ -282,6 +291,7 @@ typedef struct {
 
 typedef struct {
     setting_scan_t scan;
+    setting_favorites_t favorites;
     setting_fan_t fans;
     setting_autoscan_t autoscan;
     setting_power_t power;

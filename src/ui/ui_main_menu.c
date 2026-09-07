@@ -18,6 +18,7 @@
 #include "ui/page_common.h"
 #include "ui/page_elrs.h"
 #include "ui/page_fans.h"
+#include "ui/page_favorites.h"
 #include "ui/page_focus_chart.h"
 #include "ui/page_headtracker.h"
 #include "ui/page_imagesettings.h"
@@ -50,6 +51,7 @@ static lv_obj_t *root_page;
 static page_pack_t *page_packs[] = {
     &pp_scannow,
     &pp_source,
+    &pp_favorites,
     &pp_imagesettings,
     &pp_osd,
     &pp_power,

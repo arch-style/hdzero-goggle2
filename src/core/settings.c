@@ -1,5 +1,6 @@
 #include "settings.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,6 +22,10 @@ setting_t g_setting;
 const setting_t g_setting_defaults = {
     .scan = {
         .channel = 1,
+    },
+    .favorites = {
+        .enable = false,
+        .channel = {0, 0, 0, 0},
     },
     .fans = {
         .top_speed = 4,
@@ -351,6 +356,14 @@ void settings_load(void) {
     }
     if (g_setting.source.analog_channel > ANALOG_CHANNEL_NUM) {
         g_setting.scan.channel = 33;
+    }
+
+    // favorites
+    g_setting.favorites.enable = settings_get_bool("favorites", "enable", g_setting_defaults.favorites.enable);
+    for (int i = 0; i < FAVORITES_MAX; i++) {
+        char fav_key[8];
+        snprintf(fav_key, sizeof(fav_key), "ch%d", i + 1);
+        g_setting.favorites.channel[i] = ini_getl("favorites", fav_key, g_setting_defaults.favorites.channel[i], SETTING_INI);
     }
 
     // autoscan
