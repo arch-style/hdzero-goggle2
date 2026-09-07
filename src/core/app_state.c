@@ -38,23 +38,28 @@ void app_switch_to_menu() {
     }
 
     app_state_push(APP_STATE_MAINMENU);
+    LOGI("switch mark: to_menu start");
 
     // Stop recording if switching to menu mode from video mode regardless
     dvr_cmd(DVR_STOP);
     dvr_update_vi_conf(VR_1080P30);
+    LOGI("switch mark: dvr stopped");
 
     Display_UI();
     lvgl_switch_to_1080p();
+    LOGI("switch mark: display to UI");
     exit_tune_channel();
     osd_show(false);
     g_bShowIMS = false;
     main_menu_show(true);
+    LOGI("switch mark: menu shown");
     // Resetting the tuner here is what makes coming back cost a full
     // DM6302_init(). Standby skips that at the price of leaving it powered.
     if (g_setting.ease.fast_menu)
         HDZero_Standby();
     else
         HDZero_Close();
+    LOGI("switch mark: rf off");
     g_sdcard_det_req = 1;
     if (g_source_info.source == SOURCE_HDMI_IN) // HDMI
         IT66121_init();
@@ -62,8 +67,10 @@ void app_switch_to_menu() {
     Analog_Module_Power(0, 0);
 
     dvr_enable_line_out(false);
+    LOGI("switch mark: sources off");
 
     system_script(REC_STOP_LIVE);
+    LOGI("switch mark: to_menu done");
 }
 
 void app_exit_menu() {
@@ -180,8 +187,10 @@ void app_switch_to_hdmi_in() {
 //    false = user selected from auto scan page
 void app_switch_to_hdzero(bool is_default) {
     int ch;
+    LOGI("switch mark: to_hdzero start");
     system_exec("aww 0x0300b084 0x00001555"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
     Analog_Module_Power(0, 0);
+    LOGI("switch mark: aww + analog power");
 
     if (is_default) {
         ch = g_setting.scan.channel - 1;
@@ -192,6 +201,7 @@ void app_switch_to_hdzero(bool is_default) {
     }
 
     HDZero_open(g_setting.source.hdzero_bw);
+    LOGI("switch mark: rf open");
     ch &= 0x7f;
 
     LOGI("switch to bw:%d, band:%d, ch:%d, CAM_MODE=%d 4:3=%d", g_setting.source.hdzero_bw, g_setting.source.hdzero_band, g_setting.scan.channel, CAM_MODE, cam_4_3);
@@ -199,6 +209,7 @@ void app_switch_to_hdzero(bool is_default) {
     DM5680_clear_vldflg();
     DM5680_req_vldflg();
     progress_bar.start = 0;
+    LOGI("switch mark: channel tuned");
 
     switch (CAM_MODE) {
     case VR_720P50:
@@ -226,6 +237,7 @@ void app_switch_to_hdzero(bool is_default) {
     }
 
     channel_osd_mode = CHANNEL_SHOWTIME;
+    LOGI("switch mark: display mode set");
 
     if (CAM_MODE == VR_1080P30 || CAM_MODE == VR_1080P24)
         lvgl_switch_to_1080p();
@@ -236,6 +248,7 @@ void app_switch_to_hdzero(bool is_default) {
     osd_show(true);
     lv_timer_handler();
     Display_Osd(g_setting.record.osd);
+    LOGI("switch mark: lvgl + osd");
 
     g_setting.autoscan.last_source = SETTING_AUTOSCAN_SOURCE_HDZERO;
     ini_putl("autoscan", "last_source", g_setting.autoscan.last_source, SETTING_INI);
@@ -244,5 +257,7 @@ void app_switch_to_hdzero(bool is_default) {
     dvr_enable_line_out(false);
 
     dvr_update_vi_conf(CAM_MODE);
+    LOGI("switch mark: dvr configured");
     system_script(REC_STOP_LIVE);
+    LOGI("switch mark: to_hdzero done");
 }

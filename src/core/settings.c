@@ -509,6 +509,7 @@ void settings_load(void) {
 
     //  keep the tuner alive while the menu is open
     g_setting.ease.fast_menu = fs_file_exists(FAST_MENU_FILE);
+    LOGI("fast_menu: %s", g_setting.ease.fast_menu ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);
