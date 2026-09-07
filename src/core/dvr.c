@@ -44,7 +44,17 @@ void dvr_update_status() {
 }
 
 void dvr_enable_line_out(bool enable) {
+    // audio_sel.sh forks amixer once per mixer control: out_off measured
+    // ~100ms and out_on three times that. The menu/video switch calls this
+    // every time with the state it already has, so only touch the mixer on a
+    // real change. Nothing outside these two functions drives audio_sel.sh.
+    static int last_enable = -1;
     char buf[128];
+
+    if (last_enable == (int)enable)
+        return;
+    last_enable = enable;
+
     if (enable) {
         snprintf(buf, sizeof(buf), "%s out_on", AUDIO_SEL_SH);
         system_exec(buf);
@@ -67,6 +77,15 @@ void dvr_select_audio_source(uint8_t source) {
 
     if (source > 2)
         source = 2;
+
+    // in_mic2 and friends clear all eight input switches before setting two,
+    // twelve amixer processes in all, measured at ~365ms. The source does not
+    // change from one switch to the next.
+    static int last_source = -1;
+    if (last_source == (int)source)
+        return;
+    last_source = source;
+
     snprintf(buf, sizeof(buf), "%s %s", AUDIO_SEL_SH, audio_source[source]);
     system_exec(buf);
 }

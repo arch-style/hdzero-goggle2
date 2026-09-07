@@ -599,12 +599,35 @@ void OLED_ON(int bON) {
     pthread_mutex_unlock(&hardware_mutex);
 }
 
+// dispw reconfigures the display pipeline and measured 1.1s on this SoC, so
+// never run it to set the timing the display already has. Callers used to
+// exec it unconditionally and then record the result in g_hw_stat.vdpo_tmg;
+// this keeps that record and adds the guard. The first call always execs,
+// because the boot-time value of vdpo_tmg is an assumption, not an
+// observation.
+static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
+    // g_hw_stat.vdpo_tmg is the state of record: the HDMI-in paths that still
+    // exec dispw directly assign it too, so reading it here cannot go stale.
+    // Its boot value is an assumption though, so always exec the first time.
+    static bool applied_once = false;
+    char buf[64];
+
+    if (applied_once && g_hw_stat.vdpo_tmg == tmg) {
+        LOGI("vdpo: already %s", mode);
+        return;
+    }
+
+    snprintf(buf, sizeof(buf), "dispw -s vdpo %s", mode);
+    system_exec(buf);
+    applied_once = true;
+    g_hw_stat.vdpo_tmg = tmg;
+}
+
 void Display_UI_init() {
     g_hw_stat.source_mode = SOURCE_MODE_UI;
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    system_exec("dispw -s vdpo 1080p50");
-    g_hw_stat.vdpo_tmg = VDPO_TMG_1080P50;
+    vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
 
     if (GOGGLE_VER_2)
         system_exec("aww 0x0300b340 0x00000008");
@@ -645,8 +668,7 @@ void Display_720P60_50_t(int mode, uint8_t is_43) // fps: 0=50, 1=60
     OLED_display(0);
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    system_exec("dispw -s vdpo 720p60");
-    g_hw_stat.vdpo_tmg = VDPO_TMG_720P60;
+    vdpo_set_timing(VDPO_TMG_720P60, "720p60");
     vclk_phase_set(VIDEO_SOURCE_HDZERO_IN_720P60_50, 0);
     pclk_phase_set(VIDEO_SOURCE_HDZERO_IN_720P60_50);
 
@@ -673,8 +695,7 @@ void Display_720P90_t(int mode) {
     OLED_display(0);
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    system_exec("dispw -s vdpo 720p90");
-    g_hw_stat.vdpo_tmg = VDPO_TMG_720P90;
+    vdpo_set_timing(VDPO_TMG_720P90, "720p90");
     vclk_phase_set(VIDEO_SOURCE_HDZERO_IN_720P90, 0);
     pclk_phase_set(VIDEO_SOURCE_HDZERO_IN_720P90);
     I2C_Write(ADDR_FPGA, 0x80, 0x03);
@@ -697,8 +718,7 @@ void Display_1080P30_t(int mode) {
     OLED_display(0);
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    system_exec("dispw -s vdpo 1080p60");
-    g_hw_stat.vdpo_tmg = VDPO_TMG_1080P60;
+    vdpo_set_timing(VDPO_TMG_1080P60, "1080p60");
     vclk_phase_set(VIDEO_SOURCE_HDZERO_IN_1080P30, 0);
     pclk_phase_set(VIDEO_SOURCE_HDZERO_IN_1080P30);
 
@@ -728,8 +748,7 @@ void Display_1080P24_t(int mode) {
     OLED_display(0);
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    system_exec("dispw -s vdpo 1080p60");
-    g_hw_stat.vdpo_tmg = VDPO_TMG_1080P60;
+    vdpo_set_timing(VDPO_TMG_1080P60, "1080p60");
     vclk_phase_set(VIDEO_SOURCE_HDZERO_IN_1080P30, 0);
     pclk_phase_set(VIDEO_SOURCE_HDZERO_IN_1080P30);
 
@@ -893,12 +912,10 @@ int HDZERO_detect() // return = 1: vtmg to V536 changed
 
 void AV_Mode_Switch_fpga(int is_pal) {
     if (is_pal) {
-        system_exec("dispw -s vdpo 720p50");
-        g_hw_stat.vdpo_tmg = VDPO_TMG_720P50;
+        vdpo_set_timing(VDPO_TMG_720P50, "720p50");
         I2C_Write(ADDR_FPGA, 0x80, 0x10);
     } else {
-        system_exec("dispw -s vdpo 720p60");
-        g_hw_stat.vdpo_tmg = VDPO_TMG_720P60;
+        vdpo_set_timing(VDPO_TMG_720P60, "720p60");
         I2C_Write(ADDR_FPGA, 0x80, 0x00);
     }
     I2C_Write(ADDR_FPGA, 0x06, 0x0F);
