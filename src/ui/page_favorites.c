@@ -20,7 +20,8 @@
 #define FAVORITES_PAGE_NAME "Favorites CH"
 
 enum {
-    ROW_ENABLE = 0,
+    ROW_TITLE = 0, // names the list being edited; not selectable
+    ROW_ENABLE,
     ROW_COUNT_SEL,
     ROW_SLOT_FIRST,
     ROW_SLOT_LAST = ROW_SLOT_FIRST + FAVORITES_MAX - 1,
@@ -30,13 +31,14 @@ enum {
 };
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
-// 12 rows of 51 rather than the usual 60: this page needs 11 selectable rows
-// plus a hint line, more than any other page, and all of it has to stay on
-// screen. Not shrunk further because create_btn_group_item() builds 60px
-// widgets that only tolerate so much squeezing.
-static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
+// 51 rather than the usual 60: this page needs 12 selectable rows plus a hint
+// line, more than any other page, and all of it has to stay on screen. Not
+// shrunk further because create_btn_group_item() builds 60px widgets that only
+// tolerate so much squeezing. The hint is small text, so its row is shorter.
+static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 30, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_fav;
+static lv_obj_t *title_label;
 static lv_obj_t *count_label;
 static lv_obj_t *slot_label[FAVORITES_MAX];
 static lv_obj_t *hint_label;
@@ -57,12 +59,13 @@ static void count_label_update(void) {
 }
 
 // The page always edits the list for whatever source is being watched, so say
-// which one that is.
-static void enable_label_update(void) {
+// which one that is. This sits on its own row: create_btn_group_item() only
+// leaves 200px before its buttons, and the name with the source runs longer.
+static void title_label_update(void) {
     char buf[64];
 
     snprintf(buf, sizeof(buf), "%s (%s)", _lang(FAVORITES_PAGE_NAME), _lang(favorites_source_name()));
-    lv_label_set_text(btn_group_fav.label, buf);
+    lv_label_set_text(title_label, buf);
     btn_group_set_sel(&btn_group_fav, favorites_list()->enable ? 1 : 0);
 }
 
@@ -120,7 +123,7 @@ static void hint_label_update(void) {
 }
 
 static void page_favorites_update(void) {
-    enable_label_update();
+    title_label_update();
     count_label_update();
     for (int i = 0; i < FAVORITES_MAX; i++)
         slot_label_update(i);
@@ -160,7 +163,11 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_btn_group_item(&btn_group_fav, cont, 2, _lang(FAVORITES_PAGE_NAME), _lang("Off"), _lang("On"), "", "", row++);
+    title_label = create_label_item(cont, "", 1, row++, 3);
+    // A heading, not a choice: keep the dial from stopping on it.
+    lv_obj_clear_flag(arr->panel[ROW_TITLE], FLAG_SELECTABLE);
+
+    create_btn_group_item(&btn_group_fav, cont, 2, _lang("Enable"), _lang("Off"), _lang("On"), "", "", row++);
 
     count_label = create_label_item(cont, "", 1, row++, 3);
 
