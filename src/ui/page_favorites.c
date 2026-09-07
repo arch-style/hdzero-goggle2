@@ -30,9 +30,11 @@ enum {
 };
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
-// 12 rows of 54 rather than the usual 60: this page needs 11 selectable rows,
-// one more than any other page, and the Back row has to stay on screen.
-static lv_coord_t row_dsc[] = {54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, LV_GRID_TEMPLATE_LAST};
+// 12 rows of 51 rather than the usual 60: this page needs 11 selectable rows
+// plus a hint line, more than any other page, and all of it has to stay on
+// screen. Not shrunk further because create_btn_group_item() builds 60px
+// widgets that only tolerate so much squeezing.
+static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_fav;
 static lv_obj_t *count_label;
@@ -138,6 +140,10 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_t *section = lv_menu_section_create(page);
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1053, 894);
+    // style_submenu leaves 96px above the title. Reclaim most of it: this is
+    // the page that needs the height, and it lifts the title and the grid
+    // together, so nothing below has to move.
+    lv_obj_set_style_pad_top(section, 36, 0);
 
     snprintf(buf, sizeof(buf), "%s:", _lang(FAVORITES_PAGE_NAME));
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
