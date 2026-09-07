@@ -73,6 +73,28 @@ static page_pack_t *page_packs[] = {
 
 #define PAGE_COUNT (ARRAY_SIZE(page_packs))
 
+// Height the sidebar is given in main_menu_init().
+#define MENU_SIDEBAR_HEIGHT 975
+
+// The sidebar is a fixed height, so the entries have to shrink as pages are
+// added rather than the last one dropping off the bottom. Never looser than
+// the theme's own padding, so a short list keeps the stock look.
+static lv_coord_t menu_entry_pad_ver(void) {
+    const lv_coord_t theme_pad = 11;
+    const lv_coord_t line_h = lv_font_montserrat_24.line_height;
+    lv_coord_t pad = ((MENU_SIDEBAR_HEIGHT / (lv_coord_t)PAGE_COUNT) - line_h) / 2;
+
+    // Leave a little slack: the flex layout may add a gap of its own.
+    pad -= 2;
+
+    if (pad < 2)
+        pad = 2;
+    if (pad > theme_pad)
+        pad = theme_pad;
+
+    return pad;
+}
+
 static page_pack_t *post_bootup_actions[PAGE_COUNT];
 static size_t post_bootup_actions_count = 0;
 static bool bootup_actions_fired = false;
@@ -234,7 +256,9 @@ void menu_nav(uint8_t key) {
         if (selected >= PAGE_COUNT)
             selected -= PAGE_COUNT;
     }
-    lv_event_send(lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), selected), LV_EVENT_CLICKED, NULL);
+    lv_obj_t *entry = lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), selected);
+    lv_event_send(entry, LV_EVENT_CLICKED, NULL);
+    lv_obj_scroll_to_view(entry, LV_ANIM_OFF);
 }
 
 static void menu_reinit(void) {
@@ -277,6 +301,9 @@ static void main_menu_create_entry(lv_obj_t *menu, lv_obj_t *section, page_pack_
     pp->page = pp->create(menu, &pp->p_arr);
 
     lv_obj_t *cont = lv_menu_cont_create(section);
+    lv_coord_t pad = menu_entry_pad_ver();
+    lv_obj_set_style_pad_top(cont, pad, 0);
+    lv_obj_set_style_pad_bottom(cont, pad, 0);
 
     pp->label = lv_label_create(cont);
     lv_label_set_text(pp->label, _lang(pp->name));
@@ -323,7 +350,11 @@ void main_menu_init(void) {
     root_page = lv_menu_page_create(menu, "aaa");
 
     lv_obj_t *section = lv_menu_section_create(root_page);
-    lv_obj_clear_flag(section, LV_OBJ_FLAG_SCROLLABLE);
+    // Scrollable as a backstop: if the entries ever outgrow the sidebar even
+    // at minimum padding, menu_nav() scrolls the selection into view instead
+    // of leaving it unreachable. No scrollbar, and no movement while they fit.
+    lv_obj_set_scroll_dir(section, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(section, LV_SCROLLBAR_MODE_OFF);
 
     for (uint32_t i = 0; i < PAGE_COUNT; i++) {
         main_menu_create_entry(menu, section, page_packs[i]);
