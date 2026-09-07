@@ -15,6 +15,10 @@
 #include "page_scannow.h"
 #include "ui/ui_style.h"
 
+// "CH" rather than "Ch"/"ch": the OSD's own channel readout spells it that
+// way, and it is the only channel abbreviation shown to the user.
+#define FAVORITES_PAGE_NAME "Favorites CH"
+
 enum {
     ROW_ENABLE = 0,
     ROW_COUNT_SEL,
@@ -55,7 +59,7 @@ static void count_label_update(void) {
 static void enable_label_update(void) {
     char buf[64];
 
-    snprintf(buf, sizeof(buf), "%s (%s)", _lang("Favorites"), _lang(favorites_source_name()));
+    snprintf(buf, sizeof(buf), "%s (%s)", _lang(FAVORITES_PAGE_NAME), _lang(favorites_source_name()));
     lv_label_set_text(btn_group_fav.label, buf);
     btn_group_set_sel(&btn_group_fav, favorites_list()->enable ? 1 : 0);
 }
@@ -135,7 +139,7 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1053, 894);
 
-    snprintf(buf, sizeof(buf), "%s:", _lang("Favorites"));
+    snprintf(buf, sizeof(buf), "%s:", _lang(FAVORITES_PAGE_NAME));
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
@@ -150,7 +154,7 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_btn_group_item(&btn_group_fav, cont, 2, _lang("Favorites"), _lang("Off"), _lang("On"), "", "", row++);
+    create_btn_group_item(&btn_group_fav, cont, 2, _lang(FAVORITES_PAGE_NAME), _lang("Off"), _lang("On"), "", "", row++);
 
     count_label = create_label_item(cont, "", 1, row++, 3);
 
@@ -277,7 +281,7 @@ page_pack_t pp_favorites = {
         .cur = 0,
         .max = ROW_COUNT,
     },
-    .name = "Favorites",
+    .name = FAVORITES_PAGE_NAME,
     .create = page_favorites_create,
     .enter = on_enter,
     .exit = on_exit,
