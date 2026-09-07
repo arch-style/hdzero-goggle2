@@ -20,8 +20,7 @@
 #define FAVORITES_PAGE_NAME "Favorites CH"
 
 enum {
-    ROW_TITLE = 0, // names the list being edited; not selectable
-    ROW_ENABLE,
+    ROW_ENABLE = 0,
     ROW_COUNT_SEL,
     ROW_SLOT_FIRST,
     ROW_SLOT_LAST = ROW_SLOT_FIRST + FAVORITES_MAX - 1,
@@ -31,11 +30,11 @@ enum {
 };
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
-// 51 rather than the usual 60: this page needs 12 selectable rows plus a hint
+// 51 rather than the usual 60: this page needs 11 selectable rows plus a hint
 // line, more than any other page, and all of it has to stay on screen. Not
 // shrunk further because create_btn_group_item() builds 60px widgets that only
 // tolerate so much squeezing. The hint is small text, so its row is shorter.
-static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 30, LV_GRID_TEMPLATE_LAST};
+static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 30, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_fav;
 static lv_obj_t *title_label;
@@ -58,9 +57,8 @@ static void count_label_update(void) {
     lv_label_set_text(count_label, buf);
 }
 
-// The page always edits the list for whatever source is being watched, so say
-// which one that is. This sits on its own row: create_btn_group_item() only
-// leaves 200px before its buttons, and the name with the source runs longer.
+// The page always edits the list for whatever source is being watched, so the
+// heading says which one that is.
 static void title_label_update(void) {
     char buf[64];
 
@@ -148,10 +146,13 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     // together, so nothing below has to move.
     lv_obj_set_style_pad_top(section, 36, 0);
 
-    // The heading is blank: the title row inside the grid carries the name,
-    // and it names the source too. Kept rather than dropped so the rows below
-    // stay exactly where they are.
-    create_text(NULL, section, false, " ", LV_MENU_ITEM_BUILDER_VARIANT_2);
+    // The heading names the source as well as the page, so it has to change
+    // when the source does. Built here rather than with create_text(), which
+    // keeps no handle on its label; the styling matches what it would apply.
+    lv_obj_t *heading = lv_menu_cont_create(section);
+    title_label = lv_label_create(heading);
+    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_26, 0);
+    lv_label_set_long_mode(title_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     lv_obj_t *cont = lv_obj_create(section);
     lv_obj_set_size(cont, 960, 894);
@@ -164,10 +165,6 @@ static lv_obj_t *page_favorites_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
 
     create_select_item(arr, cont);
-
-    title_label = create_label_item(cont, "", 1, row++, 3);
-    // A heading, not a choice: keep the dial from stopping on it.
-    lv_obj_clear_flag(arr->panel[ROW_TITLE], FLAG_SELECTABLE);
 
     create_btn_group_item(&btn_group_fav, cont, 2, _lang("Enable"), _lang("Off"), _lang("On"), "", "", row++);
 
