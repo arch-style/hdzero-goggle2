@@ -129,6 +129,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     // Taller than it is, so it scrolls; on_roller keeps the selection in view.
     lv_obj_set_scroll_dir(cont, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_style_pad_top(cont, 0, 0);
+    lv_obj_scroll_to(cont, 0, 0, LV_ANIM_OFF);
     perf_cont = cont;
 
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
@@ -201,10 +203,17 @@ static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
 
 // The framework has already moved the selection by the time this runs.
 static void on_roller(uint8_t key) {
-    lv_obj_t *panel = pp_performance.p_arr.panel[pp_performance.p_arr.cur];
+    int cur = pp_performance.p_arr.cur;
 
-    if (panel)
-        lv_obj_scroll_to_view(panel, LV_ANIM_OFF);
+    // Bring the row above into view first. The dial skips over the section
+    // headings, so without this the heading scrolls off the moment the
+    // selection reaches the first item under it, which is exactly when it is
+    // most wanted.
+    if (cur > 0 && pp_performance.p_arr.panel[cur - 1])
+        lv_obj_scroll_to_view(pp_performance.p_arr.panel[cur - 1], LV_ANIM_OFF);
+
+    if (pp_performance.p_arr.panel[cur])
+        lv_obj_scroll_to_view(pp_performance.p_arr.panel[cur], LV_ANIM_OFF);
 }
 
 static void on_enter(void) {
