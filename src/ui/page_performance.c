@@ -114,20 +114,50 @@ static void create_toggle(btn_group_t *group, lv_obj_t *cont, const char *name,
 
 // What the selected section is worth knowing about, shown under the list.
 static const char *perf_comment_text(int row) {
-    if (row <= ROW_SKIP_AUDIO) {
-        // The first switch after start-up still pays for the tuner init and
-        // the display setup, because there is nothing yet to hold on to.
+    switch (row) {
+    case ROW_FAST_MENU:
+        // The first switch after start-up has nothing to hold on to yet, so
+        // it still pays for the tuner initialisation in full.
         return _lang("Takes effect from the second switch onward.");
-    }
 
-    if (row <= ROW_ANTIALIAS_OFF)
-        return _lang("Restored when the menu closes. Rougher edges.");
+    case ROW_KEEP_DISPLAY:
+        // The video's resolution is what it is; this only stops the menu
+        // overriding it, so whether the menu ends up scaled follows the source.
+        return _lang("The menu then uses the video resolution, scaled down below 1080p.");
 
-    if (row <= ROW_BOOT_FONTS)
+    case ROW_SKIP_AUDIO:
+        return _lang("No effect on sound. Takes effect from the second switch onward.");
+
+    case ROW_ANTIALIAS_OFF:
+        return _lang("Only while the menu is scaled. Restored when it closes.");
+
+    case ROW_BOOT_DISPLAY:
+        return _lang("Applies at the next start-up. The boot screen keeps the kernel's mode.");
+
+    case ROW_BOOT_FONTS:
         return _lang("Applies at the next start-up.");
 
-    if (row <= ROW_DIAL_BEEP)
-        return _lang("Applies immediately.");
+    case ROW_UI_THROTTLE:
+        return _lang("Status bar only. Its values are measured twice a second anyway.");
+
+    case ROW_LABEL_DIFF:
+        return _lang("Status bar only. Nothing is drawn later than before.");
+
+    case ROW_TIMED_LONG_PRESS:
+        return _lang("A long press becomes 500ms regardless of the key repeat rate.");
+
+    case ROW_SPLIT_LOCK:
+        return _lang("The dial and buttons wait on the drawing loop less often.");
+
+    case ROW_BUTTON_BEEP:
+        return _lang("Dial button and right button. 50ms short, 200ms long.");
+
+    case ROW_DIAL_BEEP:
+        return _lang("One 15ms beep per detent.");
+
+    default:
+        break;
+    }
 
     return _lang("All off is the original behaviour.");
 }
