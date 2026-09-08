@@ -9,6 +9,7 @@ extern "C" {
 int statusbar_init(void);
 void statubar_update(void);
 void statusbar_set_zoom(lv_coord_t zoom);
+void statusbar_show(bool show);
 
 #ifdef __cplusplus
 }

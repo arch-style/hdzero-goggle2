@@ -406,6 +406,7 @@ void main_menu_show(bool is_show) {
         main_menu_fit_display();
         menu_reinit();
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
+        statusbar_show(true); // hidden during start-up by Skip Boot Menu
         main_menu_apply_antialiasing();
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
@@ -459,8 +460,13 @@ void main_menu_init(void) {
     // moment it exists and stays there through the rest of start-up, until
     // the OSD screen is created and covers it. start_running() shows it again
     // for the one case that wants it.
-    if (g_setting.speed.skip_boot_menu)
+    if (g_setting.speed.skip_boot_menu) {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+        // With the menu and the bar hidden what is left on screen is the
+        // screen itself, which the theme paints a dark grey. Black is what
+        // the display shows anyway before the video arrives.
+        lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
+    }
 
     lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
 

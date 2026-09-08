@@ -202,10 +202,18 @@ int main(int argc, char *argv[]) {
 
     // 4. Initilize UI
     uint32_t phase_ms = time_ms();
+    uint32_t step_ms = phase_ms;
     lvgl_init();
+    LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
+
+    step_ms = time_ms();
     main_menu_init();
+    LOGI("boot phase: menu pages %ums", time_ms() - step_ms);
+
+    step_ms = time_ms();
     statusbar_init();
     lv_timer_handler();
+    LOGI("boot phase: statusbar and first draw %ums", time_ms() - step_ms);
     LOGI("boot phase: ui %ums", time_ms() - phase_ms);
 
     // 5. Prepare Display
