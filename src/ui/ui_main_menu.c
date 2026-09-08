@@ -397,6 +397,11 @@ void main_menu_show(bool is_show) {
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+        // Fast Menu Scaling turns the driver's antialias flag off for the
+        // scaled menu. Nothing else here is transformed, but the flag is
+        // global, so put it back rather than leaving video and the OSD
+        // rendering under a setting the menu asked for.
+        lvgl_set_antialiasing(true);
     }
 }
 
