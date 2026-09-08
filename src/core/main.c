@@ -79,19 +79,6 @@ a_exit:
     return NULL;
 }
 
-// Where start-up is headed. The menu is the destination only when HDZero is
-// the source and auto scan is off; everything else goes straight to video.
-static bool boot_ends_in_menu(void) {
-    int source = (g_setting.autoscan.source == SETTING_AUTOSCAN_SOURCE_LAST)
-                     ? g_setting.autoscan.last_source
-                     : g_setting.autoscan.source;
-
-    if (source != SETTING_AUTOSCAN_SOURCE_HDZERO)
-        return false;
-
-    return g_setting.autoscan.status == SETTING_AUTOSCAN_STATUS_OFF;
-}
-
 void start_running(void) {
     int source;
     if (g_setting.autoscan.source == SETTING_AUTOSCAN_SOURCE_LAST)
@@ -140,9 +127,31 @@ void start_running(void) {
         enable_esp32();
 }
 
+// The motion sensor takes 686ms of I2C to come up and nothing between here
+// and a picture needs it: the head tracker only starts reading it once the
+// threads are running. Let it happen alongside the rest of start-up.
+static void *imu_init_worker(void *arg) {
+    (void)arg;
+
+    enable_bmi270();
+
+    return NULL;
+}
+
+static pthread_t imu_init_thread;
+static bool imu_init_running = false;
+
 static void device_init(void) {
     self_test();
-    enable_bmi270();
+
+    if (g_setting.speed.async_imu) {
+        if (pthread_create(&imu_init_thread, NULL, imu_init_worker, NULL) == 0)
+            imu_init_running = true;
+        else
+            enable_bmi270();
+    } else {
+        enable_bmi270();
+    }
     IT66021_init();
     IT66121_init();
     TP2825_Config(0, 0);
@@ -214,10 +223,6 @@ int main(int argc, char *argv[]) {
     osd_font_prefetch_start();
 
     // 4. Initilize UI
-    // Building the menu is the largest thing between here and a picture, and
-    // only matters once someone opens it, so when start-up is heading for
-    // video it happens afterwards instead.
-    bool defer_menu = g_setting.speed.defer_menu && !boot_ends_in_menu();
     uint32_t boot_start_ms = time_ms();
 
     uint32_t phase_ms = time_ms();
@@ -226,9 +231,8 @@ int main(int argc, char *argv[]) {
     LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
 
     step_ms = time_ms();
-    if (!defer_menu)
-        main_menu_init();
-    LOGI("boot phase: menu pages %ums%s", time_ms() - step_ms, defer_menu ? " (deferred)" : "");
+    main_menu_init();
+    LOGI("boot phase: menu pages %ums", time_ms() - step_ms);
 
     step_ms = time_ms();
     statusbar_init();
@@ -258,6 +262,15 @@ int main(int argc, char *argv[]) {
     // 7 set initial analog module power state
     Analog_Module_Power(1, 0); // must before start_running()
 
+    // The head tracker threads are about to start reading the sensor, so it
+    // has to be up by now.
+    if (imu_init_running) {
+        step_ms = time_ms();
+        pthread_join(imu_init_thread, NULL);
+        imu_init_running = false;
+        LOGI("boot phase: waited %ums for the motion sensor", time_ms() - step_ms);
+    }
+
     // 8. Start threads
     start_running();
 
@@ -266,15 +279,6 @@ int main(int argc, char *argv[]) {
     // whole was slower, the difference sitting in things that vary by
     // hundreds of milliseconds on their own.
     LOGI("boot total: app start to video %ums", time_ms() - boot_start_ms);
-
-    if (defer_menu) {
-        step_ms = time_ms();
-        main_menu_init();
-        // Created after the OSD screen now, so it would be drawn over the
-        // video. Put it back underneath.
-        main_menu_move_behind_osd();
-        LOGI("boot phase: menu pages after video %ums", time_ms() - step_ms);
-    }
 
     create_threads();
 

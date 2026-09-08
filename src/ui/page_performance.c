@@ -23,7 +23,7 @@ enum {
     ROW_BOOT_DISPLAY,
     ROW_BOOT_FONTS,
     ROW_SKIP_BOOT_MENU,
-    ROW_DEFER_MENU,
+    ROW_ASYNC_IMU,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
@@ -44,7 +44,7 @@ enum {
 #define SAVING_BOOT_DISPLAY   "-1140ms"
 #define SAVING_BOOT_FONTS     "-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
-#define SAVING_DEFER_MENU     "no gain now"
+#define SAVING_ASYNC_IMU      "-686ms"
 #define SAVING_UI_THROTTLE    "200Hz > 20Hz"
 #define SAVING_LABEL_DIFF     "no redraw"
 #define SAVING_LONG_PRESS     "500ms fixed"
@@ -86,7 +86,7 @@ static btn_group_t btn_group_audio;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
-static btn_group_t btn_group_defer_menu;
+static btn_group_t btn_group_async_imu;
 static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
@@ -165,11 +165,8 @@ static const char *perf_comment_text(int row) {
     case ROW_SKIP_BOOT_MENU:
         return _lang("The menu is on screen during start-up until the video covers it.");
 
-    case ROW_DEFER_MENU:
-        // Measured: 5756ms to video with it off, 6197ms with it on. Building
-        // the menu was filling the wait for the font preload, and removing it
-        // only exposed that wait.
-        return _lang("No gain while Preload OSD Fonts is on: it was covering that wait.");
+    case ROW_ASYNC_IMU:
+        return _lang("Brought up alongside the rest of start-up, waited for before the threads run.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
@@ -260,8 +257,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_toggle(&btn_group_skip_boot_menu, cont, "Skip Boot Menu",
                   g_setting.speed.skip_boot_menu, SAVING_SKIP_BOOT_MENU, ROW_SKIP_BOOT_MENU);
 
-    create_toggle(&btn_group_defer_menu, cont, "Defer Menu Build",
-                  g_setting.speed.defer_menu, SAVING_DEFER_MENU, ROW_DEFER_MENU);
+    create_toggle(&btn_group_async_imu, cont, "Async Motion Sensor",
+                  g_setting.speed.async_imu, SAVING_ASYNC_IMU, ROW_ASYNC_IMU);
 
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
@@ -385,8 +382,8 @@ static void on_click(uint8_t key, int sel) {
         toggle_setting(&btn_group_skip_boot_menu, &g_setting.speed.skip_boot_menu, "skip_boot_menu");
         break;
 
-    case ROW_DEFER_MENU:
-        toggle_setting(&btn_group_defer_menu, &g_setting.speed.defer_menu, "defer_menu");
+    case ROW_ASYNC_IMU:
+        toggle_setting(&btn_group_async_imu, &g_setting.speed.async_imu, "async_imu");
         break;
 
     case ROW_UI_THROTTLE:

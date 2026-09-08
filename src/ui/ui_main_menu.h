@@ -45,7 +45,6 @@ void main_menu_update();
 void main_menu_show(bool is_show);
 // Re-resolve the antialias flag after the setting behind it changed.
 void main_menu_apply_antialiasing(void);
-void main_menu_move_behind_osd(void);
 bool main_menu_is_shown(void);
 
 void menu_nav(uint8_t key);

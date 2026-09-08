@@ -273,15 +273,10 @@ typedef struct {
     // nothing hides it: what covers it once video starts is the OSD screen,
     // created later and drawn on top. Until then it is simply on screen.
     bool skip_boot_menu;
-    // Build the menu pages after the video is up rather than before. Only when
-    // start-up is heading for video; if the menu is the destination it has to
-    // exist first.
-    //
-    // Measured at no benefit while boot_fonts is on: those 577ms of widget
-    // creation were what the font preload's wait was hiding behind, so moving
-    // them just exposes the wait. Kept because it is the other half of a pair
-    // and the arrangement may change; off is the better setting today.
-    bool defer_menu;
+    // Bring the motion sensor up on a worker thread. It is 686ms of I2C in
+    // device_init(), on the way to a picture, and nothing before the head
+    // tracker actually runs needs it.
+    bool async_imu;
     // Read the OSD font bitmaps on a worker thread started before the display
     // and tuner are brought up, so the file I/O overlaps with them.
     bool boot_fonts;
