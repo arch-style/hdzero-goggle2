@@ -218,6 +218,7 @@ int main(int argc, char *argv[]) {
     // only matters once someone opens it, so when start-up is heading for
     // video it happens afterwards instead.
     bool defer_menu = g_setting.speed.defer_menu && !boot_ends_in_menu();
+    uint32_t boot_start_ms = time_ms();
 
     uint32_t phase_ms = time_ms();
     uint32_t step_ms = phase_ms;
@@ -259,6 +260,12 @@ int main(int argc, char *argv[]) {
 
     // 8. Start threads
     start_running();
+
+    // One line to compare boots by, since the phases alone have proved
+    // misleading: they said deferring the menu was faster while the run as a
+    // whole was slower, the difference sitting in things that vary by
+    // hundreds of milliseconds on their own.
+    LOGI("boot total: app start to video %ums", time_ms() - boot_start_ms);
 
     if (defer_menu) {
         step_ms = time_ms();
