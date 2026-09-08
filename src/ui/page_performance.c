@@ -22,6 +22,8 @@ enum {
     ROW_LABEL_DIFF,
     ROW_TIMED_LONG_PRESS,
     ROW_SPLIT_LOCK,
+    ROW_CLICK_BEEP,
+    ROW_LONG_PRESS_BEEP,
     ROW_BACK,
     ROW_COUNT
 };
@@ -37,11 +39,13 @@ enum {
 #define SAVING_LABEL_DIFF   "no idle redraw"
 #define SAVING_LONG_PRESS   "500ms, steady"
 #define SAVING_SPLIT_LOCK   "10 unlocks/pass"
+#define SAVING_CLICK_BEEP   "50ms beep"
+#define SAVING_LONG_BEEP    "200ms beep"
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
 // 51 rather than 60: thirteen rows plus a note is more than the stock page
 // height allows at the usual spacing.
-static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
+static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -52,6 +56,8 @@ static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
 static btn_group_t btn_group_split_lock;
+static btn_group_t btn_group_click_beep;
+static btn_group_t btn_group_long_beep;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
@@ -131,6 +137,10 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.timed_long_press, SAVING_LONG_PRESS, ROW_TIMED_LONG_PRESS);
     create_toggle(&btn_group_split_lock, cont, "Split UI Lock",
                   g_setting.speed.split_lock, SAVING_SPLIT_LOCK, ROW_SPLIT_LOCK);
+    create_toggle(&btn_group_click_beep, cont, "Click Beep",
+                  g_setting.input.click_beep, SAVING_CLICK_BEEP, ROW_CLICK_BEEP);
+    create_toggle(&btn_group_long_beep, cont, "Long Press Beep",
+                  g_setting.input.long_press_beep, SAVING_LONG_BEEP, ROW_LONG_PRESS_BEEP);
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
@@ -154,11 +164,15 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 }
 
 // Flips one toggle and stores it, so each row is a line rather than a block.
-static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
+static void toggle_setting_in(const char *section, btn_group_t *group, bool *value, const char *key) {
     btn_group_toggle_sel(group);
     *value = btn_group_get_sel(group) == 1;
-    settings_put_bool("speed", (char *)key, *value);
-    LOGI("speed: %s=%s", key, *value ? "on" : "off");
+    settings_put_bool((char *)section, (char *)key, *value);
+    LOGI("%s: %s=%s", section, key, *value ? "on" : "off");
+}
+
+static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
+    toggle_setting_in("speed", group, value, key);
 }
 
 static void on_click(uint8_t key, int sel) {
@@ -197,6 +211,14 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_SPLIT_LOCK:
         toggle_setting(&btn_group_split_lock, &g_setting.speed.split_lock, "split_lock");
+        break;
+
+    case ROW_CLICK_BEEP:
+        toggle_setting_in("input", &btn_group_click_beep, &g_setting.input.click_beep, "click_beep");
+        break;
+
+    case ROW_LONG_PRESS_BEEP:
+        toggle_setting_in("input", &btn_group_long_beep, &g_setting.input.long_press_beep, "long_press_beep");
         break;
 
     default:

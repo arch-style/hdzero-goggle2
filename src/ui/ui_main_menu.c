@@ -39,6 +39,7 @@
 #include "ui/ui_porting.h"
 #include "ui/ui_statusbar.h"
 #include "ui/ui_style.h"
+#include "util/time.h"
 
 LV_IMG_DECLARE(img_arrow);
 
@@ -313,8 +314,16 @@ void menu_nav(uint8_t key) {
     }
 
     lv_obj_t *entry = lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), selected);
+
+    // Loading the page a menu entry points at is the expensive half of a dial
+    // step; the redraw it causes is the other half and is timed in main().
+    uint32_t t0 = time_ms();
     lv_event_send(entry, LV_EVENT_CLICKED, NULL);
     lv_obj_scroll_to_view(entry, LV_ANIM_OFF);
+
+    uint32_t dt = time_ms() - t0;
+    if (dt >= 10)
+        LOGI("menu_nav: page load %ums", dt);
 }
 
 static void menu_reinit(void) {

@@ -146,6 +146,20 @@ void lvgl_init() {
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_make(64, 64, 64), 0);
 }
 
+// lv_timer_handler() is where LVGL actually draws. Menu navigation is much
+// heavier than video, and with the menu scaled to fit 720p every change
+// inside it is rendered into a layer and then resampled, so log the passes
+// that run long rather than guessing which part is slow.
+static void ui_draw_timed(void) {
+    uint32_t t0 = time_ms();
+
+    lv_timer_handler();
+
+    uint32_t dt = time_ms() - t0;
+    if (dt >= 20)
+        LOGI("ui: draw %ums", dt);
+}
+
 int main(int argc, char *argv[]) {
     pthread_mutex_init(&lvgl_mutex, NULL);
 
@@ -266,7 +280,7 @@ int main(int argc, char *argv[]) {
         UI_STAGE(ims_update());
         UI_STAGE(ui_osd_element_pos_update());
         UI_STAGE(ht_detect_motion());
-        UI_STAGE(lv_timer_handler());
+        UI_STAGE(ui_draw_timed());
         if (slow_tick)
             UI_STAGE(source_status_timer());
 

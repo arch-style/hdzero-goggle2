@@ -291,6 +291,14 @@ typedef struct {
     bool split_lock;
 } setting_speed_t;
 
+typedef struct {
+    // Beep when a short press is recognised, which happens on release.
+    bool click_beep;
+    // Beep when a long press reaches its threshold, so it is audible that the
+    // press has registered without waiting to see what it did.
+    bool long_press_beep;
+} setting_input_t;
+
 typedef enum {
     SETTING_SOURCES_ANALOG_MODULE_INTERNAL = 0,
     SETTING_SOURCES_ANALOG_MODULE_EXTERNAL = 1
@@ -349,6 +357,7 @@ typedef struct {
     setting_scan_t scan;
     setting_favorites_t favorites;
     setting_speed_t speed;
+    setting_input_t input;
     setting_fan_t fans;
     setting_autoscan_t autoscan;
     setting_power_t power;

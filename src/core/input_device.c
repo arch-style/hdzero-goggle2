@@ -30,6 +30,7 @@
 #include "core/favorites.h"
 #include "core/settings.h"
 #include "core/sleep_mode.h"
+#include "driver/beep.h"
 #include "driver/dm6302.h"
 #include "driver/hardware.h"
 #include "driver/i2c.h"
@@ -63,6 +64,19 @@ static uint16_t tune_timer = 0;
 // Roughly what the counted-repeats rule worked out to: a 250ms autorepeat
 // delay plus nine 33ms repeats.
 #define LONG_PRESS_MS 500
+
+// Audible confirmation that a press registered. beep_dur() hands the work to
+// its own thread, so these do not hold up the input loop. Two lengths, so a
+// long press is distinguishable from a short one by ear alone.
+static void input_click_feedback(void) {
+    if (g_setting.input.click_beep)
+        beep_dur(BEEP_SHORT);
+}
+
+static void input_long_press_feedback(void) {
+    if (g_setting.input.long_press_beep)
+        beep_dur(BEEP_LONG);
+}
 
 static int epfd;
 static pthread_t input_device_pid;
@@ -477,11 +491,13 @@ static void get_event(int fd) {
 
                         if (!btn_long_fired && (time_ms() - btn_down_ms) >= LONG_PRESS_MS) {
                             btn_long_fired = true;
+                            input_long_press_feedback();
                             btn_press();
                             g_key = DIAL_KEY_PRESS;
                         }
                     } else {
                         if (!btn_long_fired && btn_down_ms != 0) {
+                            input_click_feedback();
                             btn_click();
                             g_key = DIAL_KEY_CLICK;
                         }
@@ -490,6 +506,7 @@ static void get_event(int fd) {
                     }
                 } else if (btn_value) {
                     if (btn_press_time == 10) {
+                        input_long_press_feedback();
                         btn_press();
                         g_key = DIAL_KEY_PRESS;
                     }
@@ -497,6 +514,7 @@ static void get_event(int fd) {
                     // LOGI("btn down");
                 } else {
                     if (btn_press_time < 10) {
+                        input_click_feedback();
                         btn_click();
                         g_key = DIAL_KEY_CLICK;
                     }

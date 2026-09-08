@@ -104,6 +104,10 @@ const setting_t g_setting_defaults = {
         .timed_long_press = false,
         .split_lock = false,
     },
+    .input = {
+        .click_beep = false,
+        .long_press_beep = false,
+    },
     .osd = {
         .orbit = 2,
         .embedded_mode = EMBEDDED_4x3,
@@ -527,6 +531,10 @@ void settings_load(void) {
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
+
+    // input feedback
+    g_setting.input.click_beep = settings_get_bool("input", "click_beep", g_setting_defaults.input.click_beep);
+    g_setting.input.long_press_beep = settings_get_bool("input", "long_press_beep", g_setting_defaults.input.long_press_beep);
     LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s ui_throttle=%s",
          g_setting.speed.fast_menu ? "on" : "off",
          g_setting.speed.keep_display ? "on" : "off",
