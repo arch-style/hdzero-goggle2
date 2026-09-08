@@ -18,6 +18,7 @@
 #include "ui/page_common.h"
 #include "ui/page_elrs.h"
 #include "ui/page_fans.h"
+#include "ui/page_fastmenu.h"
 #include "ui/page_favorites.h"
 #include "ui/page_focus_chart.h"
 #include "ui/page_headtracker.h"
@@ -46,12 +47,14 @@ static lv_obj_t *menu;
 static lv_obj_t *root_page;
 
 /**
- * Page order is enforced by definition.
+ * Page order is enforced by definition. The first MENU_STOCK_COUNT entries are
+ * the stock menu, untouched and reachable exactly as before; everything this
+ * fork adds sits behind them on a second page, reached by rolling past either
+ * end of the list.
  */
 static page_pack_t *page_packs[] = {
     &pp_scannow,
     &pp_source,
-    &pp_favorites,
     &pp_imagesettings,
     &pp_osd,
     &pp_power,
@@ -69,9 +72,16 @@ static page_pack_t *page_packs[] = {
     &pp_input,
     &pp_analog_rssi,
     &pp_sleep,
+
+    // --- second page ---
+    &pp_favorites,
+    &pp_fastmenu,
 };
 
 #define PAGE_COUNT (ARRAY_SIZE(page_packs))
+
+// Entries belonging to the stock first page.
+#define MENU_STOCK_COUNT (PAGE_COUNT - 2)
 
 // Height the sidebar is given in main_menu_init().
 #define MENU_SIDEBAR_HEIGHT 975
@@ -86,7 +96,9 @@ static lv_coord_t menu_entry_pad_ver(void) {
     // value is not readable from here, but the sidebar overflowing at 20
     // entries of 49px and fitting at 19 bounds it to 0..2.
     const lv_coord_t gap = 2;
-    const lv_coord_t entries = (lv_coord_t)PAGE_COUNT;
+    // Only the larger page has to fit, and it is the stock one, so this
+    // reproduces the stock spacing rather than shrinking it for the additions.
+    const lv_coord_t entries = (lv_coord_t)MENU_STOCK_COUNT;
 
     lv_coord_t entry_h = (MENU_SIDEBAR_HEIGHT - gap * (entries - 1)) / entries;
     lv_coord_t pad = (entry_h - line_h) / 2;
@@ -248,18 +260,56 @@ void submenu_click(void) {
     }
 }
 
+// Which entries the current menu page covers, as an inclusive index range
+// into page_packs.
+static int menu_page = 0; // 0 = stock entries, 1 = this fork's additions
+
+static int menu_page_first(int page) {
+    return page ? MENU_STOCK_COUNT : 0;
+}
+
+static int menu_page_last(int page) {
+    return page ? (int)PAGE_COUNT - 1 : MENU_STOCK_COUNT - 1;
+}
+
+// Entries outside the current page are hidden, which also takes them out of
+// the sidebar's flex layout, so the page in view starts at the top.
+static void menu_page_apply(void) {
+    for (uint32_t i = 0; i < PAGE_COUNT; i++) {
+        lv_obj_t *cont = lv_obj_get_parent(page_packs[i]->label);
+        bool on_page = ((int)i >= menu_page_first(menu_page)) && ((int)i <= menu_page_last(menu_page));
+
+        if (on_page)
+            lv_obj_clear_flag(cont, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(cont, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
 void menu_nav(uint8_t key) {
     static int8_t selected = 0;
-    LOGI("menu_nav: key = %d,sel = %d", key, selected);
+    LOGI("menu_nav: key = %d,sel = %d,page = %d", key, selected, menu_page);
+
+    // Rolling past either end of a page moves to the other page rather than
+    // wrapping within it.
     if (key == DIAL_KEY_DOWN) {
-        selected--;
-        if (selected < 0)
-            selected += PAGE_COUNT;
+        if (selected > menu_page_first(menu_page)) {
+            selected--;
+        } else {
+            menu_page = !menu_page;
+            menu_page_apply();
+            selected = menu_page_last(menu_page);
+        }
     } else if (key == DIAL_KEY_UP) {
-        selected++;
-        if (selected >= PAGE_COUNT)
-            selected -= PAGE_COUNT;
+        if (selected < menu_page_last(menu_page)) {
+            selected++;
+        } else {
+            menu_page = !menu_page;
+            menu_page_apply();
+            selected = menu_page_first(menu_page);
+        }
     }
+
     lv_obj_t *entry = lv_obj_get_child(lv_obj_get_child(lv_menu_get_cur_sidebar_page(menu), 0), selected);
     lv_event_send(entry, LV_EVENT_CLICKED, NULL);
     lv_obj_scroll_to_view(entry, LV_ANIM_OFF);
@@ -286,12 +336,40 @@ static void menu_reinit(void) {
     }
 }
 
+// The menu is laid out for the resolution it was built at, 1080p. Drawn over
+// 720p video there is not room for it, so scale the whole tree rather than
+// re-laying out all twenty-odd pages: an object with transform_zoom is
+// rendered into a layer together with its children, so one call covers every
+// page. Scaling is about the object's top-left, so its own offset is scaled
+// by hand to keep the whole thing on screen.
+#define MENU_POS_X 250
+#define MENU_POS_Y 96
+
+static lv_coord_t menu_design_ver_res = 0;
+
+static void main_menu_fit_display(void) {
+    lv_coord_t ver_res = lv_disp_get_ver_res(NULL);
+    lv_coord_t zoom = LV_IMG_ZOOM_NONE;
+
+    if (menu_design_ver_res > 0 && ver_res < menu_design_ver_res)
+        zoom = (ver_res * LV_IMG_ZOOM_NONE) / menu_design_ver_res;
+
+    lv_obj_set_style_transform_zoom(menu, zoom, 0);
+    lv_obj_set_pos(menu,
+                   (MENU_POS_X * zoom) / LV_IMG_ZOOM_NONE,
+                   (MENU_POS_Y * zoom) / LV_IMG_ZOOM_NONE);
+
+    LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
+}
+
 bool main_menu_is_shown(void) {
     return !lv_obj_has_flag(menu, LV_OBJ_FLAG_HIDDEN);
 }
 
 void main_menu_show(bool is_show) {
     if (is_show) {
+        // The display can have changed resolution since the last time.
+        main_menu_fit_display();
         menu_reinit();
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -348,8 +426,9 @@ void main_menu_init(void) {
     lv_obj_set_style_border_width(menu, 2, 0);
     lv_obj_set_style_border_color(menu, lv_color_make(255, 0, 0), 0);
     lv_obj_set_style_border_side(menu, LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_RIGHT, 0);
-    lv_obj_set_size(menu, lv_disp_get_hor_res(NULL) - 500, lv_disp_get_ver_res(NULL) - 96);
-    lv_obj_set_pos(menu, 250, 96);
+    lv_obj_set_size(menu, lv_disp_get_hor_res(NULL) - 500, lv_disp_get_ver_res(NULL) - MENU_POS_Y);
+    lv_obj_set_pos(menu, MENU_POS_X, MENU_POS_Y);
+    menu_design_ver_res = lv_disp_get_ver_res(NULL);
 
     root_page = lv_menu_page_create(menu, "aaa");
 
@@ -369,6 +448,8 @@ void main_menu_init(void) {
 
     // Resort based on priority
     qsort(post_bootup_actions, post_bootup_actions_count, sizeof(page_pack_t *), post_bootup_actions_cmp);
+
+    menu_page_apply();
 
     lv_obj_add_style(section, &style_rootmenu, LV_PART_MAIN);
     lv_obj_set_size(section, 250, 975);

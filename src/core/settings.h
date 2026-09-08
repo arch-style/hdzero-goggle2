@@ -249,13 +249,19 @@ typedef struct {
     // 1=keep the HDZero tuner configured while the menu is open instead of
     // resetting it, so returning to video skips DM6302_init(). Costs power:
     // the tuner stays alive for as long as the menu is up.
-    uint8_t fast_menu;
-    // 1=leave the display on whatever timing the video was using when the
-    // menu opens, instead of reconfiguring it to 1080p50. Saves the ~1.1s
-    // dispw call in both directions, at the cost of the menu being cropped
-    // whenever the video is not already 1080p.
-    uint8_t keep_display;
 } ease_use_t;
+
+typedef struct {
+    // Keep the HDZero tuner configured while the menu is open instead of
+    // resetting it, so returning to video skips DM6302_init(), measured at
+    // 2.3s. The tuner stays powered for as long as the menu is up.
+    bool fast_menu;
+    // Draw the menu over the running video instead of handing the display to
+    // the UI layer, which is what forces the 1.1s dispw call in both
+    // directions. The menu is laid out for 1080p, so it is cropped whenever
+    // the video is not.
+    bool keep_display;
+} setting_speed_t;
 
 typedef enum {
     SETTING_SOURCES_ANALOG_MODULE_INTERNAL = 0,
@@ -314,6 +320,7 @@ typedef struct {
 typedef struct {
     setting_scan_t scan;
     setting_favorites_t favorites;
+    setting_speed_t speed;
     setting_fan_t fans;
     setting_autoscan_t autoscan;
     setting_power_t power;

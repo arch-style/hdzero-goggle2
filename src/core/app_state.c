@@ -51,7 +51,7 @@ void app_switch_to_menu() {
     // at all: leave the pipeline composing video with the UI layer over it,
     // exactly as it does for the OSD, and let the menu draw into that layer.
     // The menu is laid out for 1080p, so at 720p it is cropped.
-    bool overlay = g_setting.ease.keep_display && vdpo_timing_applied();
+    bool overlay = g_setting.speed.keep_display && vdpo_timing_applied();
 
     if (!overlay) {
         Display_UI();
@@ -70,7 +70,7 @@ void app_switch_to_menu() {
     // leaving it powered.
     if (overlay)
         ; // video keeps playing under the menu
-    else if (g_setting.ease.fast_menu)
+    else if (g_setting.speed.fast_menu)
         HDZero_Standby();
     else
         HDZero_Close();
