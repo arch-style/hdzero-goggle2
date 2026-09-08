@@ -30,6 +30,8 @@ enum {
     ROW_SPLIT_LOCK,
     ROW_BUTTON_BEEP,
     ROW_DIAL_BEEP,
+    ROW_HEAD_BUGFIX,
+    ROW_RETRY_TUNER,
     ROW_BACK,
     ROW_COUNT
 };
@@ -47,6 +49,7 @@ enum {
 #define SAVING_SPLIT_LOCK   "10 unlocks"
 #define SAVING_BUTTON_BEEP  "50 / 200ms"
 #define SAVING_DIAL_BEEP    "15ms"
+#define SAVING_RETRY_TUNER  "retry on fail"
 #define SAVING_ANTIALIAS    "faster redraw"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
@@ -73,7 +76,8 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -87,6 +91,7 @@ static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_button_beep;
 static btn_group_t btn_group_dial_beep;
 static slider_group_t slider_long_press;
+static btn_group_t btn_group_retry_tuner;
 
 // The slider carries an index into long_press_choices, and shows the value.
 static void long_press_slider_update(void) {
@@ -175,6 +180,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_DIAL_BEEP:
         return _lang("One 15ms beep per detent.");
+
+    case ROW_RETRY_TUNER:
+        return _lang("Stock calls the tuner open even when it failed, so nothing retried.");
 
     default:
         break;
@@ -265,6 +273,10 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.input.button_beep, SAVING_BUTTON_BEEP, ROW_BUTTON_BEEP);
     create_toggle(&btn_group_dial_beep, cont, "Dial Beep",
                   g_setting.input.dial_beep, SAVING_DIAL_BEEP, ROW_DIAL_BEEP);
+
+    create_heading(cont, arr, _lang("Bug Fix"), ROW_HEAD_BUGFIX);
+    create_toggle(&btn_group_retry_tuner, cont, "Retry Tuner Init",
+                  g_setting.bugfix.retry_tuner_init, SAVING_RETRY_TUNER, ROW_RETRY_TUNER);
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
@@ -400,6 +412,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_DIAL_BEEP:
         toggle_setting_in("input", &btn_group_dial_beep, &g_setting.input.dial_beep, "dial_beep");
+        break;
+
+    case ROW_RETRY_TUNER:
+        toggle_setting_in("bugfix", &btn_group_retry_tuner, &g_setting.bugfix.retry_tuner_init, "retry_tuner_init");
         break;
 
     default:

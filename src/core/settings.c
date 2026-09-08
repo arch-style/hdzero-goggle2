@@ -116,6 +116,9 @@ const setting_t g_setting_defaults = {
         .split_lock = false,
         .menu_antialias_off = false,
     },
+    .bugfix = {
+        .retry_tuner_init = false,
+    },
     .input = {
         .button_beep = false,
         .dial_beep = false,
@@ -547,6 +550,9 @@ void settings_load(void) {
     g_setting.speed.menu_antialias_off = settings_get_bool("speed", "menu_antialias_off", g_setting_defaults.speed.menu_antialias_off);
 
     // input feedback
+    // bug fixes
+    g_setting.bugfix.retry_tuner_init = settings_get_bool("bugfix", "retry_tuner_init", g_setting_defaults.bugfix.retry_tuner_init);
+
     g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);
     g_setting.input.dial_beep = settings_get_bool("input", "dial_beep", g_setting_defaults.input.dial_beep);
     g_setting.input.long_press_ms = ini_getl("input", "long_press_ms", g_setting_defaults.input.long_press_ms, SETTING_INI);

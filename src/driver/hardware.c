@@ -826,8 +826,10 @@ void HDZero_open(int bw) {
         // the receivers are then unconfigured: no picture, or noise, or one
         // module dead and its two antennas with it. Marking the tuner open
         // anyway told the rest of the app it was fine and left nothing to
-        // retry. Leave it closed instead, so the next switch tries again.
-        if (DM6302_init(0, g_hw_stat.hdz_bw) != 0) {
+        // retry. Leaving it closed means the next switch tries again.
+        int init_failed = DM6302_init(0, g_hw_stat.hdz_bw);
+
+        if (init_failed && g_setting.bugfix.retry_tuner_init) {
             LOGE("HDZero: receivers did not come up, leaving closed to retry");
             g_hw_stat.hdzero_open = 0;
             g_hw_stat.hdz_standby = 0;

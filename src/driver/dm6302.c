@@ -1758,17 +1758,13 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
 
     system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
 
-    // Only the first register read is checked, at the top of the retry loop,
-    // and nothing verifies the thousand writes that follow. A module that
-    // stops answering partway through is configured wrongly and silently,
-    // which shows up as one receiver dead and its two antennas with it. Read
-    // the same register back so at least the log says which module it was.
-    SPI_Read(0x6, 0xFF0, &r0, &r1);
-    if ((r0 != 0x18) || (r1 != 0x18)) {
-        LOGE("Error: DM6302 lost during init: left=0x%x right=0x%x (expect 0x18)", r0, r1);
-        return 1;
-    }
-
+    // No verification here. 0x6/0xFF0 is the obvious candidate, since the
+    // retry loop above checks it, but DM6302_M0() writes zero to that very
+    // register on its first line to load the M0 image, so reading 0x18 back
+    // after init always fails. Checking it made init report failure every
+    // time, which left DM5680_SetBB(1) unreached and the picture wrong.
+    // Verifying the rest of the sequence needs a register that is meaningful
+    // at this point, and there is no documentation for these parts.
     return 0;
 }
 

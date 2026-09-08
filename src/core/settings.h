@@ -298,6 +298,14 @@ typedef struct {
 } setting_speed_t;
 
 typedef struct {
+    // DM6302_init() gives up after ten tries and says so, but HDZero_open()
+    // marked the tuner open regardless, so the app believed unconfigured
+    // receivers were fine and nothing ever tried again. On means a failed
+    // init leaves the tuner closed, and the next switch initialises it.
+    bool retry_tuner_init;
+} setting_bugfix_t;
+
+typedef struct {
     // Beep on every recognised button press: the dial button short and long,
     // and the right button. A long press gets a longer beep so the two are
     // distinguishable by ear.
@@ -374,6 +382,7 @@ typedef struct {
     setting_favorites_t favorites;
     setting_speed_t speed;
     setting_input_t input;
+    setting_bugfix_t bugfix;
     setting_fan_t fans;
     setting_autoscan_t autoscan;
     setting_power_t power;
