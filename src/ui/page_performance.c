@@ -45,11 +45,12 @@ enum {
 #define SAVING_FAST_SCALING "no filtering"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
-// first button's arrow at the start of column 2, so with the stock columns the
-// arrow lands 120px inside the label and collides with any name long enough to
-// reach it. Widen column 1 so the label box ends before column 2 begins.
-// 120 + 340 + 180 + 180 + 140 fills the 960px container exactly.
-static lv_coord_t col_dsc[] = {120, 340, 180, 180, 140, 0, LV_GRID_TEMPLATE_LAST};
+// first button's arrow at the start of column 2, so column 1 has to be wider
+// than that box or the arrow lands on the name. The last column holds the
+// saving and is clipped at the container edge, so it gets the rest: 180px was
+// still cutting the longer ones short.
+// 90 + 340 + 175 + 175 + 180 fills the 960px container exactly.
+static lv_coord_t col_dsc[] = {90, 340, 175, 175, 180, 0, LV_GRID_TEMPLATE_LAST};
 // 51 rather than 60: thirteen rows plus a note is more than the stock page
 // height allows at the usual spacing.
 // This page has more rows than fit however they are sized, so rather than
@@ -61,7 +62,7 @@ static lv_coord_t col_dsc[] = {120, 340, 180, 180, 140, 0, LV_GRID_TEMPLATE_LAST
 // The first fitting attempt left a third of the page unused, so take the
 // space: the photographs show the menu background running well past where
 // the rows stopped. Anything past this still scrolls.
-#define PERF_VISIBLE_H 780
+#define PERF_VISIBLE_H (780 - PERF_ROW_H) // one row given back to the comment
 
 static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
@@ -82,6 +83,7 @@ static btn_group_t btn_group_click_beep;
 static btn_group_t btn_group_long_beep;
 static btn_group_t btn_group_fast_scaling;
 static lv_obj_t *perf_cont;
+static lv_obj_t *perf_comment;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
@@ -107,6 +109,28 @@ static void create_toggle(btn_group_t *group, lv_obj_t *cont, const char *name,
     create_btn_group_item(group, cont, 2, _lang(name), _lang("Off"), _lang("On"), "", "", row);
     btn_group_set_sel(group, value ? 1 : 0);
     create_saving_label(cont, saving, row);
+}
+
+// What the selected section is worth knowing about, shown under the list.
+static const char *perf_comment_text(int row) {
+    if (row <= ROW_SKIP_AUDIO) {
+        // The first switch after start-up still pays for the tuner init and
+        // the display setup, because there is nothing yet to hold on to.
+        return _lang("Takes effect from the second switch onward.");
+    }
+
+    if (row <= ROW_BOOT_FONTS)
+        return _lang("Applies at the next start-up.");
+
+    if (row <= ROW_LONG_PRESS_BEEP)
+        return _lang("Applies immediately.");
+
+    return _lang("All off is the original behaviour.");
+}
+
+static void perf_comment_update(void) {
+    if (perf_comment)
+        lv_label_set_text(perf_comment, perf_comment_text(pp_performance.p_arr.cur));
 }
 
 static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
@@ -144,7 +168,7 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
+    create_heading(cont, arr, _lang("Menu / Video Switch"), ROW_HEAD_MENU);
     create_toggle(&btn_group_tuner, cont, "Keep Tuner Alive",
                   g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     create_toggle(&btn_group_overlay, cont, "Menu Over Video",
@@ -179,18 +203,15 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     pp_performance.p_arr.max = ROW_COUNT;
 
-    lv_obj_t *note = lv_label_create(cont);
-    snprintf(buf, sizeof(buf), "%s\n%s",
-             _lang("All off is the original behaviour."),
-             _lang("Menu times are per switch, boot times are once at start-up."));
-    lv_label_set_text(note, buf);
-
-    lv_obj_set_style_text_font(note, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_align(note, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_text_color(note, lv_color_make(255, 255, 255), 0);
-    lv_obj_set_style_pad_top(note, 12, 0);
-    lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);
-    lv_obj_set_grid_cell(note, LV_GRID_ALIGN_START, 1, 4, LV_GRID_ALIGN_START, ROW_COUNT, 1);
+    // Outside the scrolling list, so it stays put while the list moves.
+    perf_comment = lv_label_create(section);
+    lv_obj_set_width(perf_comment, 960);
+    lv_obj_set_style_text_font(perf_comment, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_align(perf_comment, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_color(perf_comment, lv_color_make(255, 255, 255), 0);
+    lv_obj_set_style_pad_left(perf_comment, 90, 0);
+    lv_label_set_long_mode(perf_comment, LV_LABEL_LONG_WRAP);
+    perf_comment_update();
 
     return page;
 }
@@ -220,11 +241,15 @@ static void on_roller(uint8_t key) {
 
     if (pp_performance.p_arr.panel[cur])
         lv_obj_scroll_to_view(pp_performance.p_arr.panel[cur], LV_ANIM_OFF);
+
+    perf_comment_update();
 }
 
 static void on_enter(void) {
     if (perf_cont)
         lv_obj_scroll_to(perf_cont, 0, 0, LV_ANIM_OFF);
+
+    perf_comment_update();
 }
 
 static void on_click(uint8_t key, int sel) {
