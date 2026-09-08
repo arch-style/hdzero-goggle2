@@ -187,7 +187,21 @@ static void get_imu_data() {
     has_motion_data = true;
 }
 
+// The timer is armed for one second from ht_init() and fires at 100Hz from
+// then on, regardless of whether the sensor is up: it is a POSIX timer, not
+// something the app's threads gate. get_bmi270() polls the data-ready bit in
+// an unbounded loop, so reading a sensor that has not been configured spins
+// on the I2C bus forever, and that bus is shared with the FPGA.
+static volatile bool imu_ready = false;
+
+void ht_set_imu_ready(void) {
+    imu_ready = true;
+}
+
 static void timer_callback_imu(union sigval timer_data) {
+    if (!imu_ready)
+        return;
+
     get_imu_data();
     calculate_orientation();
 }

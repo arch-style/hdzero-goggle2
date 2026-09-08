@@ -232,12 +232,14 @@ void app_switch_to_hdzero(bool is_default) {
     int ch;
     LOGI("switch mark: to_hdzero start");
 
-    // Before the tuner, so the two run together instead of one after the
-    // other. Display_720P60_50() and friends collect it where they would
-    // otherwise have started it.
+    system_exec("aww 0x0300b084 0x00001555"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
+
+    // After the clock drive strength, which used to run before dispw and now
+    // has no reason not to, and before the tuner, so the two run together
+    // instead of one after the other. Display_720P60_50() and friends collect
+    // it where they would otherwise have started it.
     if (g_setting.speed.async_display)
         start_display_timing_early();
-    system_exec("aww 0x0300b084 0x00001555"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
     Analog_Module_Power(0, 0);
     LOGI("switch mark: aww + analog power");
 
