@@ -482,9 +482,15 @@ void main_menu_init(void) {
     lv_obj_set_style_border_width(menu, 2, 0);
     lv_obj_set_style_border_color(menu, lv_color_make(255, 0, 0), 0);
     lv_obj_set_style_border_side(menu, LV_BORDER_SIDE_LEFT | LV_BORDER_SIDE_RIGHT, 0);
-    lv_obj_set_size(menu, lv_disp_get_hor_res(NULL) - 500, lv_disp_get_ver_res(NULL) - MENU_POS_Y);
+    // The sub-pages are laid out at fixed 1080p sizes, so the menu that holds
+    // them has to be that size too, whatever the display happens to be when
+    // this runs. Reading the current resolution here worked only because the
+    // menu used to be built before the video switched to 720p; with the build
+    // deferred it produced a 720p-sized menu full of 1080p-sized pages, and
+    // left main_menu_fit_display() thinking no scaling was needed.
+    lv_obj_set_size(menu, DRAW_HOR_RES_FHD - 500, DRAW_VER_RES_FHD - MENU_POS_Y);
     lv_obj_set_pos(menu, MENU_POS_X, MENU_POS_Y);
-    menu_design_ver_res = lv_disp_get_ver_res(NULL);
+    menu_design_ver_res = DRAW_VER_RES_FHD;
 
     root_page = lv_menu_page_create(menu, "aaa");
 
