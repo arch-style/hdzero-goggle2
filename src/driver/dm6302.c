@@ -15,7 +15,7 @@
 #include "uart.h"
 #include "util/system.h"
 
-#define WAIT(ms) usleep((ms) * 1000)
+#define WAIT(ms) usleep((ms)*1000)
 
 void SPI_Read(uint8_t page, uint16_t addr, uint32_t *dat0, uint32_t *dat1) {
     uint8_t val;
@@ -1757,6 +1757,17 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     LOGI("M0 done");
 
     system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
+
+    // Only the first register read is checked, at the top of the retry loop,
+    // and nothing verifies the thousand writes that follow. A module that
+    // stops answering partway through is configured wrongly and silently,
+    // which shows up as one receiver dead and its two antennas with it. Read
+    // the same register back so at least the log says which module it was.
+    SPI_Read(0x6, 0xFF0, &r0, &r1);
+    if ((r0 != 0x18) || (r1 != 0x18)) {
+        LOGE("Error: DM6302 lost during init: left=0x%x right=0x%x (expect 0x18)", r0, r1);
+        return 1;
+    }
 
     return 0;
 }

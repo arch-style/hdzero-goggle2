@@ -4,10 +4,13 @@
 
 #include <log/log.h>
 
+#include "core/app_state.h"
+#include "core/common.hh"
 #include "core/settings.h"
 #include "lang/language.h"
 #include "page_common.h"
 #include "ui/ui_style.h"
+#include <minIni.h>
 
 enum {
     ROW_HEAD_SWITCH = 0,
@@ -23,6 +26,7 @@ enum {
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
     ROW_TIMED_LONG_PRESS,
+    ROW_LONG_PRESS_MS,
     ROW_SPLIT_LOCK,
     ROW_BUTTON_BEEP,
     ROW_DIAL_BEEP,
@@ -69,7 +73,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -82,6 +86,20 @@ static btn_group_t btn_group_long_press;
 static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_button_beep;
 static btn_group_t btn_group_dial_beep;
+static slider_group_t slider_long_press;
+
+// The slider carries an index into long_press_choices, and shows the value.
+static void long_press_slider_update(void) {
+    char buf[16];
+    int idx = long_press_choice_index(g_setting.input.long_press_ms);
+
+    if (idx < 0)
+        idx = 0;
+
+    lv_slider_set_value(slider_long_press.slider, idx, LV_ANIM_OFF);
+    snprintf(buf, sizeof(buf), "%dms", long_press_choices[idx]);
+    lv_label_set_text(slider_long_press.label, buf);
+}
 static btn_group_t btn_group_antialias;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
@@ -144,7 +162,10 @@ static const char *perf_comment_text(int row) {
         return _lang("Status bar only. Nothing is drawn later than before.");
 
     case ROW_TIMED_LONG_PRESS:
-        return _lang("A long press becomes 500ms regardless of the key repeat rate.");
+        return _lang("A long press is timed instead of counting key repeats.");
+
+    case ROW_LONG_PRESS_MS:
+        return _lang("Only used while Timed Long Press is on.");
 
     case ROW_SPLIT_LOCK:
         return _lang("The dial and buttons wait on the drawing loop less often.");
@@ -227,6 +248,17 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.label_diff, SAVING_LABEL_DIFF, ROW_LABEL_DIFF);
     create_toggle(&btn_group_long_press, cont, "Timed Long Press",
                   g_setting.speed.timed_long_press, SAVING_LONG_PRESS, ROW_TIMED_LONG_PRESS);
+    create_slider_item(&slider_long_press, cont, _lang("Long Press Time"),
+                       LONG_PRESS_CHOICE_NUM - 1, 0, ROW_LONG_PRESS_MS);
+    // create_slider_item() puts its value label in column 5, which this page
+    // does not have room for, so give the slider one column and the value the
+    // one the savings use on the other rows.
+    lv_obj_set_grid_cell(slider_long_press.slider, LV_GRID_ALIGN_STRETCH, 3, 1,
+                         LV_GRID_ALIGN_CENTER, ROW_LONG_PRESS_MS, 1);
+    lv_obj_set_grid_cell(slider_long_press.label, LV_GRID_ALIGN_START, 4, 2,
+                         LV_GRID_ALIGN_CENTER, ROW_LONG_PRESS_MS, 1);
+    long_press_slider_update();
+
     create_toggle(&btn_group_split_lock, cont, "Split UI Lock",
                   g_setting.speed.split_lock, SAVING_SPLIT_LOCK, ROW_SPLIT_LOCK);
     create_toggle(&btn_group_button_beep, cont, "Button Beep",
@@ -268,6 +300,22 @@ static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
 // The framework has already moved the selection by the time this runs.
 static void on_roller(uint8_t key) {
     int cur = pp_performance.p_arr.cur;
+
+    if (g_app_state == APP_STATE_SUBMENU_ITEM_FOCUSED && cur == ROW_LONG_PRESS_MS) {
+        int idx = long_press_choice_index(g_setting.input.long_press_ms);
+
+        if (idx < 0)
+            idx = 0;
+
+        if (key == DIAL_KEY_UP && idx < LONG_PRESS_CHOICE_NUM - 1)
+            idx++;
+        else if (key == DIAL_KEY_DOWN && idx > 0)
+            idx--;
+
+        g_setting.input.long_press_ms = long_press_choices[idx];
+        long_press_slider_update();
+        return;
+    }
 
     // Bring the row above into view first. The dial skips over the section
     // headings, so without this the heading scrolls off the moment the
@@ -321,6 +369,20 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_TIMED_LONG_PRESS:
         toggle_setting(&btn_group_long_press, &g_setting.speed.timed_long_press, "timed_long_press");
+        break;
+
+    case ROW_LONG_PRESS_MS:
+        // Same two-step edit the fans page uses: click to take the dial, turn
+        // to change, click to put it back.
+        if (g_app_state == APP_STATE_SUBMENU_ITEM_FOCUSED) {
+            ini_putl("input", "long_press_ms", g_setting.input.long_press_ms, SETTING_INI);
+            LOGI("input: long_press_ms=%d", g_setting.input.long_press_ms);
+            lv_obj_add_style(slider_long_press.slider, &style_silder_main, LV_PART_MAIN);
+            app_state_push(APP_STATE_SUBMENU);
+        } else {
+            app_state_push(APP_STATE_SUBMENU_ITEM_FOCUSED);
+            lv_obj_add_style(slider_long_press.slider, &style_silder_select, LV_PART_MAIN);
+        }
         break;
 
     case ROW_SPLIT_LOCK:

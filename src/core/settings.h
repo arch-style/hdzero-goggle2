@@ -304,7 +304,16 @@ typedef struct {
     bool button_beep;
     // Beep on every dial step. Short, because the dial turns quickly.
     bool dial_beep;
+    // How long a press has to be held to count as long, when Timed Long Press
+    // is on. One of LONG_PRESS_CHOICES.
+    uint16_t long_press_ms;
 } setting_input_t;
+
+// Offered on the settings page as a slider, longest first.
+#define LONG_PRESS_CHOICE_NUM 5
+extern const uint16_t long_press_choices[LONG_PRESS_CHOICE_NUM];
+// Position of ms in that list, or -1 if it is not one of them.
+int long_press_choice_index(uint16_t ms);
 
 typedef enum {
     SETTING_SOURCES_ANALOG_MODULE_INTERNAL = 0,

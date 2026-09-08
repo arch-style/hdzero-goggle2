@@ -61,10 +61,6 @@ static uint16_t tune_timer = 0;
 
 #define EPOLL_FD_CNT 4
 
-// Roughly what the counted-repeats rule worked out to: a 250ms autorepeat
-// delay plus nine 33ms repeats.
-#define LONG_PRESS_MS 500
-
 // A dial step is much shorter than a press, because the dial turns quickly and
 // 50ms of beep per detent would run into the next one.
 #define BEEP_DIAL 15
@@ -508,7 +504,7 @@ static void get_event(int fd) {
                         if (btn_down_ms == 0)
                             btn_down_ms = time_ms();
 
-                        if (!btn_long_fired && (time_ms() - btn_down_ms) >= LONG_PRESS_MS) {
+                        if (!btn_long_fired && (time_ms() - btn_down_ms) >= g_setting.input.long_press_ms) {
                             btn_long_fired = true;
                             input_long_press_feedback();
                             btn_press();

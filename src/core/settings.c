@@ -19,6 +19,17 @@
 
 setting_t g_setting;
 
+const uint16_t long_press_choices[LONG_PRESS_CHOICE_NUM] = {500, 400, 300, 200, 100};
+
+int long_press_choice_index(uint16_t ms) {
+    for (int i = 0; i < LONG_PRESS_CHOICE_NUM; i++) {
+        if (long_press_choices[i] == ms)
+            return i;
+    }
+
+    return -1;
+}
+
 const setting_t g_setting_defaults = {
     .scan = {
         .channel = 1,
@@ -108,6 +119,7 @@ const setting_t g_setting_defaults = {
     .input = {
         .button_beep = false,
         .dial_beep = false,
+        .long_press_ms = 500,
     },
     .osd = {
         .orbit = 2,
@@ -537,6 +549,9 @@ void settings_load(void) {
     // input feedback
     g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);
     g_setting.input.dial_beep = settings_get_bool("input", "dial_beep", g_setting_defaults.input.dial_beep);
+    g_setting.input.long_press_ms = ini_getl("input", "long_press_ms", g_setting_defaults.input.long_press_ms, SETTING_INI);
+    if (long_press_choice_index(g_setting.input.long_press_ms) < 0)
+        g_setting.input.long_press_ms = g_setting_defaults.input.long_press_ms;
     LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s ui_throttle=%s",
          g_setting.speed.fast_menu ? "on" : "off",
          g_setting.speed.keep_display ? "on" : "off",

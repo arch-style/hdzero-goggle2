@@ -821,7 +821,19 @@ void HDZero_open(int bw) {
     if (g_hw_stat.hdzero_open == 0) {
         g_hw_stat.hdz_bw = bw;
         DM5680_SetBR(g_hw_stat.hdz_bw);
-        DM6302_init(0, g_hw_stat.hdz_bw);
+
+        // DM6302_init() gives up after ten tries and returns non-zero, and
+        // the receivers are then unconfigured: no picture, or noise, or one
+        // module dead and its two antennas with it. Marking the tuner open
+        // anyway told the rest of the app it was fine and left nothing to
+        // retry. Leave it closed instead, so the next switch tries again.
+        if (DM6302_init(0, g_hw_stat.hdz_bw) != 0) {
+            LOGE("HDZero: receivers did not come up, leaving closed to retry");
+            g_hw_stat.hdzero_open = 0;
+            g_hw_stat.hdz_standby = 0;
+            return;
+        }
+
         DM5680_SetBB(1);
         g_hw_stat.hdzero_open = 1;
         g_hw_stat.hdz_standby = 0;
@@ -853,6 +865,9 @@ void HDZero_Close() {
 void HDZero_Standby() {
     if (g_hw_stat.hdzero_open == 0) {
         // Nothing configured to hold on to; a close is all this can mean.
+        // This also covers an init that failed: holding on to a receiver that
+        // never came up would keep a bad picture bad, where a close makes the
+        // next switch initialise from scratch.
         HDZero_Close();
         return;
     }
