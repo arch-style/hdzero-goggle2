@@ -24,6 +24,7 @@ enum {
     ROW_BOOT_FONTS,
     ROW_SKIP_BOOT_MENU,
     ROW_ASYNC_IMU,
+    ROW_ASYNC_DISPLAY,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
@@ -45,6 +46,7 @@ enum {
 #define SAVING_BOOT_FONTS     "-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
 #define SAVING_ASYNC_IMU      "-686ms"
+#define SAVING_ASYNC_DISPLAY  "-1100ms"
 #define SAVING_UI_THROTTLE    "200Hz > 20Hz"
 #define SAVING_LABEL_DIFF     "no redraw"
 #define SAVING_LONG_PRESS     "500ms fixed"
@@ -78,7 +80,8 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -87,6 +90,7 @@ static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
 static btn_group_t btn_group_async_imu;
+static btn_group_t btn_group_async_display;
 static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
@@ -167,6 +171,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_ASYNC_IMU:
         return _lang("Brought up alongside the rest of start-up, waited for before the threads run.");
+
+    case ROW_ASYNC_DISPLAY:
+        return _lang("Runs with the tuner init. The panel blanks a little earlier.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
@@ -259,6 +266,9 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_toggle(&btn_group_async_imu, cont, "Async Motion Sensor",
                   g_setting.speed.async_imu, SAVING_ASYNC_IMU, ROW_ASYNC_IMU);
+
+    create_toggle(&btn_group_async_display, cont, "Async Display Setup",
+                  g_setting.speed.async_display, SAVING_ASYNC_DISPLAY, ROW_ASYNC_DISPLAY);
 
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
@@ -384,6 +394,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_ASYNC_IMU:
         toggle_setting(&btn_group_async_imu, &g_setting.speed.async_imu, "async_imu");
+        break;
+
+    case ROW_ASYNC_DISPLAY:
+        toggle_setting(&btn_group_async_display, &g_setting.speed.async_display, "async_display");
         break;
 
     case ROW_UI_THROTTLE:

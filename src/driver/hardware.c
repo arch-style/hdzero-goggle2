@@ -613,10 +613,74 @@ bool vdpo_timing_applied(void) {
     return vdpo_applied_once;
 }
 
+// dispw is over a second and it configures the SoC's display output, which
+// has nothing to do with the tuner coming up on the FPGA's I2C. Run it on a
+// worker started before the tuner init, and collect it where the timing is
+// actually needed. The panel is blanked first, because the stock order blanks
+// before changing the mode and a mode change on a live panel is not something
+// to find out about the hard way.
+static pthread_t vdpo_thread;
+static bool vdpo_pending = false;
+static vdpo_tmg_t vdpo_pending_tmg;
+static char vdpo_pending_mode[16];
+
+static void *vdpo_worker(void *arg) {
+    char buf[64];
+
+    (void)arg;
+    snprintf(buf, sizeof(buf), "dispw -s vdpo %s", vdpo_pending_mode);
+    system_exec(buf);
+
+    return NULL;
+}
+
+static void vdpo_collect(void) {
+    if (!vdpo_pending)
+        return;
+
+    pthread_join(vdpo_thread, NULL);
+    vdpo_pending = false;
+    vdpo_applied_once = true;
+    g_hw_stat.vdpo_tmg = vdpo_pending_tmg;
+}
+
+void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode) {
+    if (vdpo_pending)
+        return;
+
+    if (vdpo_applied_once && g_hw_stat.vdpo_tmg == tmg)
+        return; // already there, nothing to run
+
+    OLED_display(0);
+
+    snprintf(vdpo_pending_mode, sizeof(vdpo_pending_mode), "%s", mode);
+    vdpo_pending_tmg = tmg;
+
+    if (pthread_create(&vdpo_thread, NULL, vdpo_worker, NULL) != 0) {
+        LOGE("vdpo: could not start the async timing change");
+        return;
+    }
+
+    vdpo_pending = true;
+    LOGI("vdpo: %s started in the background", mode);
+}
+
 static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
     // g_hw_stat.vdpo_tmg is the state of record: the HDMI-in paths that still
     // exec dispw directly assign it too, so reading it here cannot go stale.
     char buf[64];
+
+    if (vdpo_pending) {
+        // Whatever is in flight has to finish before another one starts, and
+        // if it was this one there is nothing left to do.
+        vdpo_tmg_t started = vdpo_pending_tmg;
+
+        vdpo_collect();
+        if (started == tmg) {
+            LOGI("vdpo: collected %s", mode);
+            return;
+        }
+    }
 
     if (vdpo_applied_once && g_hw_stat.vdpo_tmg == tmg) {
         LOGI("vdpo: already %s", mode);

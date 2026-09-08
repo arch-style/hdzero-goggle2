@@ -201,9 +201,42 @@ void app_switch_to_hdmi_in() {
 // is_default:
 //    true = load from g_settings
 //    false = user selected from auto scan page
+// Which display timing the camera mode below will ask for. Mirrors the switch
+// further down, so the two have to stay in step; getting it wrong only costs
+// the head start, since vdpo_set_timing() runs the right one either way.
+static void start_display_timing_early(void) {
+    switch (CAM_MODE) {
+    case VR_720P50:
+    case VR_720P60:
+    case VR_960x720P60:
+    case VR_540P60:
+        vdpo_start_timing_async(VDPO_TMG_720P60, "720p60");
+        break;
+
+    case VR_540P90:
+    case VR_540P90_CROP:
+        vdpo_start_timing_async(VDPO_TMG_720P90, "720p90");
+        break;
+
+    case VR_1080P30:
+    case VR_1080P24:
+        vdpo_start_timing_async(VDPO_TMG_1080P60, "1080p60");
+        break;
+
+    default:
+        break;
+    }
+}
+
 void app_switch_to_hdzero(bool is_default) {
     int ch;
     LOGI("switch mark: to_hdzero start");
+
+    // Before the tuner, so the two run together instead of one after the
+    // other. Display_720P60_50() and friends collect it where they would
+    // otherwise have started it.
+    if (g_setting.speed.async_display)
+        start_display_timing_early();
     system_exec("aww 0x0300b084 0x00001555"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
     Analog_Module_Power(0, 0);
     LOGI("switch mark: aww + analog power");

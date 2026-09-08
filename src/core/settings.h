@@ -277,6 +277,11 @@ typedef struct {
     // device_init(), on the way to a picture, and nothing before the head
     // tracker actually runs needs it.
     bool async_imu;
+    // Start the display timing change before the tuner init rather than after
+    // it. dispw drives the SoC's display output and the tuner init is I2C to
+    // the FPGA, so the two have no reason to be serialised, but between them
+    // they are most of the time to a picture.
+    bool async_display;
     // Read the OSD font bitmaps on a worker thread started before the display
     // and tuner are brought up, so the file I/O overlaps with them.
     bool boot_fonts;

@@ -112,6 +112,7 @@ const setting_t g_setting_defaults = {
         .boot_fonts = false,
         .skip_boot_menu = false,
         .async_imu = false,
+        .async_display = false,
         .ui_throttle = false,
         .label_diff = false,
         .timed_long_press = false,
@@ -547,6 +548,7 @@ void settings_load(void) {
     g_setting.speed.boot_fonts = settings_get_bool("speed", "boot_fonts", g_setting_defaults.speed.boot_fonts);
     g_setting.speed.skip_boot_menu = settings_get_bool("speed", "skip_boot_menu", g_setting_defaults.speed.skip_boot_menu);
     g_setting.speed.async_imu = settings_get_bool("speed", "async_imu", g_setting_defaults.speed.async_imu);
+    g_setting.speed.async_display = settings_get_bool("speed", "async_display", g_setting_defaults.speed.async_display);
     g_setting.speed.ui_throttle = settings_get_bool("speed", "ui_throttle", g_setting_defaults.speed.ui_throttle);
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
@@ -563,7 +565,7 @@ void settings_load(void) {
     g_setting.input.long_press_ms = ini_getl("input", "long_press_ms", g_setting_defaults.input.long_press_ms, SETTING_INI);
     if (long_press_choice_index(g_setting.input.long_press_ms) < 0)
         g_setting.input.long_press_ms = g_setting_defaults.input.long_press_ms;
-    LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s skip_boot_menu=%s async_imu=%s ui_throttle=%s",
+    LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s skip_boot_menu=%s async_imu=%s async_display=%s ui_throttle=%s",
          g_setting.speed.fast_menu ? "on" : "off",
          g_setting.speed.keep_display ? "on" : "off",
          g_setting.speed.skip_audio ? "on" : "off",
@@ -571,6 +573,7 @@ void settings_load(void) {
          g_setting.speed.boot_fonts ? "on" : "off",
          g_setting.speed.skip_boot_menu ? "on" : "off",
          g_setting.speed.async_imu ? "on" : "off",
+         g_setting.speed.async_display ? "on" : "off",
          g_setting.speed.ui_throttle ? "on" : "off");
 
     // storage

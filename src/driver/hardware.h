@@ -93,6 +93,9 @@ void Display_UI_init();
 // True once dispw has actually been run, so callers can tell a real display
 // state from the assumed boot one.
 bool vdpo_timing_applied(void);
+// Begin a display timing change in the background; the next vdpo_set_timing()
+// for the same timing collects it instead of running dispw itself.
+void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode);
 void Display_UI();
 void Display_720P90(int mode);
 void Display_720P60_50(int mode, uint8_t is_43);
