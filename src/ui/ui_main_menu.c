@@ -455,7 +455,13 @@ static int post_bootup_actions_cmp(const void *lhs, const void *rhs) {
 
 void main_menu_init(void) {
     menu = lv_menu_create(lv_scr_act());
-    // lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+    // Upstream leaves this commented out, so the menu is on screen from the
+    // moment it exists and stays there through the rest of start-up, until
+    // the OSD screen is created and covers it. start_running() shows it again
+    // for the one case that wants it.
+    if (g_setting.speed.skip_boot_menu)
+        lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+
     lv_obj_clear_flag(menu, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_set_style_bg_color(menu, lv_color_make(32, 32, 32), 0);

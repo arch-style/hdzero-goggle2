@@ -22,6 +22,7 @@ enum {
     ROW_HEAD_BOOT,
     ROW_BOOT_DISPLAY,
     ROW_BOOT_FONTS,
+    ROW_SKIP_BOOT_MENU,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
@@ -36,18 +37,19 @@ enum {
 
 // Measured on the goggles with the switch path instrumented, so the cost of
 // leaving one off is visible rather than implied.
-#define SAVING_FAST_MENU    "-2300ms"
-#define SAVING_KEEP_DISPLAY "-1100ms x2"
-#define SAVING_SKIP_AUDIO   "-460ms"
-#define SAVING_BOOT_DISPLAY "-1140ms"
-#define SAVING_BOOT_FONTS   "-1000ms"
-#define SAVING_UI_THROTTLE  "200Hz > 20Hz"
-#define SAVING_LABEL_DIFF   "no redraw"
-#define SAVING_LONG_PRESS   "500ms fixed"
-#define SAVING_SPLIT_LOCK   "10 unlocks"
-#define SAVING_BUTTON_BEEP  "50 / 200ms"
-#define SAVING_DIAL_BEEP    "15ms"
-#define SAVING_ANTIALIAS    "faster redraw"
+#define SAVING_FAST_MENU      "-2300ms"
+#define SAVING_KEEP_DISPLAY   "-1100ms x2"
+#define SAVING_SKIP_AUDIO     "-460ms"
+#define SAVING_BOOT_DISPLAY   "-1140ms"
+#define SAVING_BOOT_FONTS     "-1000ms"
+#define SAVING_SKIP_BOOT_MENU "no menu flash"
+#define SAVING_UI_THROTTLE    "200Hz > 20Hz"
+#define SAVING_LABEL_DIFF     "no redraw"
+#define SAVING_LONG_PRESS     "500ms fixed"
+#define SAVING_SPLIT_LOCK     "10 unlocks"
+#define SAVING_BUTTON_BEEP    "50 / 200ms"
+#define SAVING_DIAL_BEEP      "15ms"
+#define SAVING_ANTIALIAS      "faster redraw"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
 // first button's arrow at the start of column 2, so column 1 has to be wider
@@ -74,13 +76,14 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
 static btn_group_t btn_group_audio;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
+static btn_group_t btn_group_skip_boot_menu;
 static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
@@ -155,6 +158,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_BOOT_FONTS:
         return _lang("Applies at the next start-up.");
+
+    case ROW_SKIP_BOOT_MENU:
+        return _lang("The menu is on screen during start-up until the video covers it.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
@@ -241,6 +247,9 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.boot_display, SAVING_BOOT_DISPLAY, ROW_BOOT_DISPLAY);
     create_toggle(&btn_group_boot_fonts, cont, "Preload OSD Fonts",
                   g_setting.speed.boot_fonts, SAVING_BOOT_FONTS, ROW_BOOT_FONTS);
+
+    create_toggle(&btn_group_skip_boot_menu, cont, "Skip Boot Menu",
+                  g_setting.speed.skip_boot_menu, SAVING_SKIP_BOOT_MENU, ROW_SKIP_BOOT_MENU);
 
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
@@ -358,6 +367,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_BOOT_FONTS:
         toggle_setting(&btn_group_boot_fonts, &g_setting.speed.boot_fonts, "boot_fonts");
+        break;
+
+    case ROW_SKIP_BOOT_MENU:
+        toggle_setting(&btn_group_skip_boot_menu, &g_setting.speed.skip_boot_menu, "skip_boot_menu");
         break;
 
     case ROW_UI_THROTTLE:

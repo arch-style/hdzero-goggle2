@@ -53,6 +53,7 @@ SDL_mutex *global_sdl_mutex;
 #include "ui/ui_osd_element_pos.h"
 #include "ui/ui_porting.h"
 #include "ui/ui_statusbar.h"
+#include "util/time.h"
 
 int gif_cnt = 0;
 
@@ -97,6 +98,7 @@ void start_running(void) {
             app_switch_to_hdzero(true);
         } else { // auto scan disabled, go to go directly to last saved channel
             app_state_push(APP_STATE_MAINMENU);
+            main_menu_show(true); // the menu is the destination here
         }
     } else {
         app_state_push(APP_STATE_VIDEO);
@@ -199,25 +201,31 @@ int main(int argc, char *argv[]) {
     osd_font_prefetch_start();
 
     // 4. Initilize UI
+    uint32_t phase_ms = time_ms();
     lvgl_init();
     main_menu_init();
     statusbar_init();
     lv_timer_handler();
+    LOGI("boot phase: ui %ums", time_ms() - phase_ms);
 
     // 5. Prepare Display
+    phase_ms = time_ms();
     OLED_Startup();
     Display_UI_init();
     OLED_Pattern(0, 0, 0);
     osd_init();
     ims_init();
     ui_osd_element_pos_init();
+    LOGI("boot phase: display and osd %ums", time_ms() - phase_ms);
 
     // 6. Enable functionality
+    phase_ms = time_ms();
     if (g_setting.ht.enable) {
         ht_enable();
     } else {
         ht_disable();
     }
+    LOGI("boot phase: head tracker %ums", time_ms() - phase_ms);
 
     // 7 set initial analog module power state
     Analog_Module_Power(1, 0); // must before start_running()

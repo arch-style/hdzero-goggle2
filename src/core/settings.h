@@ -269,6 +269,10 @@ typedef struct {
     // for the UI and then immediately sets the video timing, paying dispw
     // twice; the boot UI then shows at whatever mode the kernel left.
     bool boot_display;
+    // Do not show the menu while starting up. It is created visible and
+    // nothing hides it: what covers it once video starts is the OSD screen,
+    // created later and drawn on top. Until then it is simply on screen.
+    bool skip_boot_menu;
     // Read the OSD font bitmaps on a worker thread started before the display
     // and tuner are brought up, so the file I/O overlaps with them.
     bool boot_fonts;
