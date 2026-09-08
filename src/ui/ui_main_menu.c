@@ -15,6 +15,7 @@
 #include "lang/language.h"
 #include "ui/page_analog_rssi.h"
 #include "ui/page_autoscan.h"
+#include "ui/page_bugfix.h"
 #include "ui/page_clock.h"
 #include "ui/page_common.h"
 #include "ui/page_elrs.h"
@@ -79,12 +80,13 @@ static page_pack_t *page_packs[] = {
     // --- second page ---
     &pp_favorites,
     &pp_performance,
+    &pp_bugfix,
 };
 
 #define PAGE_COUNT (ARRAY_SIZE(page_packs))
 
 // Entries belonging to the stock first page.
-#define MENU_STOCK_COUNT (PAGE_COUNT - 2)
+#define MENU_STOCK_COUNT (PAGE_COUNT - 3)
 
 // The sidebar fills the menu, which starts below the status bar.
 #define MENU_POS_Y          96

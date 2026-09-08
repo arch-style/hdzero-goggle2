@@ -1758,13 +1758,16 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
 
     system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
 
-    // No verification here. 0x6/0xFF0 is the obvious candidate, since the
-    // retry loop above checks it, but DM6302_M0() writes zero to that very
-    // register on its first line to load the M0 image, so reading 0x18 back
-    // after init always fails. Checking it made init report failure every
-    // time, which left DM5680_SetBB(1) unreached and the picture wrong.
-    // Verifying the rest of the sequence needs a register that is meaningful
-    // at this point, and there is no documentation for these parts.
+    // Recorded, never judged. Checking 0x6/0xFF0 for 0x18 here was wrong:
+    // DM6302_M0() writes zero to that register on its first line to load the
+    // M0 image, so the check failed every time and took the picture with it.
+    // What a healthy chip reads back at this point is simply not known, and
+    // there is no documentation for these parts, so log both sides and let
+    // the logs from a working goggle and a misbehaving one say what it is.
+    // Nothing acts on this.
+    SPI_Read(0x6, 0xFF0, &r0, &r1);
+    LOGI("DM6302 after init: 0x6/0xFF0 left=0x%x right=0x%x", r0, r1);
+
     return 0;
 }
 

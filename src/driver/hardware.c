@@ -830,7 +830,17 @@ void HDZero_open(int bw) {
         int init_failed = DM6302_init(0, g_hw_stat.hdz_bw);
 
         if (init_failed && g_setting.bugfix.retry_tuner_init) {
-            LOGE("HDZero: receivers did not come up, leaving closed to retry");
+            // Straight away, because at boot there is no next switch to wait
+            // for: without this the picture stays wrong until the user
+            // happens to open the menu and come back. One extra attempt only,
+            // since DM6302_init() has already cycled the reset ten times and
+            // each attempt costs a couple of seconds.
+            LOGE("HDZero: receivers did not come up, trying once more");
+            init_failed = DM6302_init(0, g_hw_stat.hdz_bw);
+        }
+
+        if (init_failed && g_setting.bugfix.retry_tuner_init) {
+            LOGE("HDZero: receivers still not up, leaving closed to retry");
             g_hw_stat.hdzero_open = 0;
             g_hw_stat.hdz_standby = 0;
             return;
