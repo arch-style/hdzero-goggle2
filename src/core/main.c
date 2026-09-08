@@ -128,8 +128,9 @@ void start_running(void) {
 }
 
 // The motion sensor takes 686ms of I2C to come up and nothing between here
-// and a picture needs it: the head tracker only starts reading it once the
-// threads are running. Let it happen alongside the rest of start-up.
+// and a picture needs it. The motion timer in ht.c would start reading it a
+// second after ht_init() whether it was up or not, so that timer stays idle
+// until ht_set_imu_ready() is called after the join below.
 static void *imu_init_worker(void *arg) {
     (void)arg;
 
@@ -265,14 +266,17 @@ int main(int argc, char *argv[]) {
     // 7 set initial analog module power state
     Analog_Module_Power(1, 0); // must before start_running()
 
-    // The head tracker threads are about to start reading the sensor, so it
-    // has to be up by now.
+    // The motion timer armed in ht_init() has been firing since a second after
+    // that call, but it does nothing until told the sensor is up. Wait for the
+    // async init if there was one, then open the gate. The gate is opened on
+    // every path, async or not: without it the head tracker never reads.
     if (imu_init_running) {
         step_ms = time_ms();
         pthread_join(imu_init_thread, NULL);
         imu_init_running = false;
         LOGI("boot phase: waited %ums for the motion sensor", time_ms() - step_ms);
     }
+    ht_set_imu_ready();
 
     // 8. Start threads
     start_running();
