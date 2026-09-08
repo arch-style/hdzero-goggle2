@@ -645,11 +645,16 @@ static void vdpo_collect(void) {
 }
 
 void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode) {
+    // Under hardware_mutex like every other display change: vdpo_set_timing()
+    // reads and clears this same state, and the source detect thread reaches
+    // it through Display_720P60_50_t() while this runs from the switch path.
+    pthread_mutex_lock(&hardware_mutex);
+
     if (vdpo_pending)
-        return;
+        goto done;
 
     if (vdpo_applied_once && g_hw_stat.vdpo_tmg == tmg)
-        return; // already there, nothing to run
+        goto done; // already there, nothing to run
 
     OLED_display(0);
 
@@ -658,11 +663,14 @@ void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode) {
 
     if (pthread_create(&vdpo_thread, NULL, vdpo_worker, NULL) != 0) {
         LOGE("vdpo: could not start the async timing change");
-        return;
+        goto done;
     }
 
     vdpo_pending = true;
     LOGI("vdpo: %s started in the background", mode);
+
+done:
+    pthread_mutex_unlock(&hardware_mutex);
 }
 
 static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
