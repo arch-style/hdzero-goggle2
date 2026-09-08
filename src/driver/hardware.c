@@ -630,45 +630,25 @@ static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
 }
 
 void Display_UI_init() {
-    // dispw is the single most expensive thing on the menu/video path, 1.1s
-    // measured, and reconfiguring for the menu is the only reason it runs.
-    // With keep_display the panel stays on the timing the video was using;
-    // the menu is laid out for 1080p, so it gets cropped at anything less.
-    // The boot call still configures the display, since nothing has yet.
-    bool reconfigure = !g_setting.ease.keep_display || !vdpo_applied_once;
-
     g_hw_stat.source_mode = SOURCE_MODE_UI;
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    if (reconfigure)
-        vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
+    vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
 
     if (GOGGLE_VER_2)
         system_exec("aww 0x0300b340 0x00000008");
 
     Display_VO_SWITCH(0);
 
-    // The clock phases go with the timing, not with the source: MENU_UI's
-    // values are the ones for 1080p50. Applying them while the panel is still
-    // running the video timing is what tore the picture into stripes, so when
-    // the timing stays put these are left exactly as the video set them.
-    if (reconfigure) {
-        vclk_phase_set(VIDEO_SOURCE_MENU_UI, 0);
-        pclk_phase_set(VIDEO_SOURCE_MENU_UI);
-    }
+    vclk_phase_set(VIDEO_SOURCE_MENU_UI, 0);
+    pclk_phase_set(VIDEO_SOURCE_MENU_UI);
     I2C_Write(ADDR_FPGA, 0x80, 0x00);
     I2C_Write(ADDR_FPGA, 0x84, 0x11);
 
-    // The panel timing has to follow the pipeline timing, so it moves only
-    // when the pipeline did.
-    if (reconfigure)
-        OLED_SetTMG(0);
-
+    OLED_SetTMG(0);
     system_exec("aww 0x0300b084 0x00002aaa"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
 
-    // 0xa7 tracks the timing too: the video paths set 0x11 for 720p and this
-    // sets 0x00 alongside the 1080p50 switch, so it moves only when they do.
-    if (GOGGLE_VER_2 && reconfigure)
+    if (GOGGLE_VER_2)
         I2C_Write(ADDR_FPGA, 0xa7, 0x00);
 
     system_exec("aww 0x06542018 0x00000044"); // disable horizontal chroma FIR filter.

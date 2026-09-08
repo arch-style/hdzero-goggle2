@@ -45,20 +45,32 @@ void app_switch_to_menu() {
     dvr_update_vi_conf(VR_1080P30);
     LOGI("switch mark: dvr stopped");
 
-    Display_UI();
-    // Match the canvas to the pipeline: with keep_display the panel is still
-    // on the video timing, so drawing the menu at 1080p would not line up.
-    if (!g_setting.ease.keep_display || !vdpo_timing_applied())
+    // Switching the display source to UI on its own is what forces the 1080p50
+    // rebuild, and leaving the panel on the video timing while doing it tore
+    // the picture into stripes. So with keep_display do not switch the source
+    // at all: leave the pipeline composing video with the UI layer over it,
+    // exactly as it does for the OSD, and let the menu draw into that layer.
+    // The menu is laid out for 1080p, so at 720p it is cropped.
+    bool overlay = g_setting.ease.keep_display && vdpo_timing_applied();
+
+    if (!overlay) {
+        Display_UI();
         lvgl_switch_to_1080p();
+    }
     LOGI("switch mark: display to UI");
     exit_tune_channel();
     osd_show(false);
     g_bShowIMS = false;
     main_menu_show(true);
     LOGI("switch mark: menu shown");
-    // Resetting the tuner here is what makes coming back cost a full
-    // DM6302_init(). Standby skips that at the price of leaving it powered.
-    if (g_setting.ease.fast_menu)
+    // Overlaying the menu only means anything if the picture underneath keeps
+    // running, so leave the tuner alone entirely in that case. Otherwise:
+    // resetting the tuner here is what makes coming back cost a full
+    // DM6302_init(), measured at 2.3s. Standby skips that at the price of
+    // leaving it powered.
+    if (overlay)
+        ; // video keeps playing under the menu
+    else if (g_setting.ease.fast_menu)
         HDZero_Standby();
     else
         HDZero_Close();
@@ -67,7 +79,8 @@ void app_switch_to_menu() {
     if (g_source_info.source == SOURCE_HDMI_IN) // HDMI
         IT66121_init();
 
-    Analog_Module_Power(0, 0);
+    if (!overlay) // the picture underneath has to keep its source powered
+        Analog_Module_Power(0, 0);
 
     dvr_enable_line_out(false);
     LOGI("switch mark: sources off");
