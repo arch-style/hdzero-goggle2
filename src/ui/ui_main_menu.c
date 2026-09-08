@@ -357,21 +357,10 @@ static void menu_reinit(void) {
 #define MENU_POS_X 250
 
 static lv_coord_t menu_design_ver_res = 0;
-static bool menu_scaled = false;
 
-bool main_menu_is_shown(void);
-
-// Two things ask about antialiasing: the global setting, and Fast Menu Scaling
-// which drops it while the menu is scaled because the resampling is what makes
-// navigation heavy. Resolve both in one place so neither can leave the flag
-// somewhere the other did not intend.
+// Global, and nothing else touches the flag, so this is the whole rule.
 void main_menu_apply_antialiasing(void) {
-    bool want = g_setting.speed.antialiasing;
-
-    if (menu_scaled && main_menu_is_shown() && g_setting.speed.fast_scaling)
-        want = false;
-
-    lvgl_set_antialiasing(want);
+    lvgl_set_antialiasing(!g_setting.speed.antialias_off);
 }
 
 static void main_menu_fit_display(void) {
@@ -394,9 +383,6 @@ static void main_menu_fit_display(void) {
 
     statusbar_set_zoom(zoom);
 
-    menu_scaled = (zoom != LV_IMG_ZOOM_NONE);
-    main_menu_apply_antialiasing();
-
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
 
@@ -412,9 +398,6 @@ void main_menu_show(bool is_show) {
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
-        // Fast Menu Scaling only applies while the menu is up, so leaving it
-        // hidden must fall back to whatever the global setting says.
-        main_menu_apply_antialiasing();
     }
 }
 
@@ -491,6 +474,9 @@ void main_menu_init(void) {
     qsort(post_bootup_actions, post_bootup_actions_count, sizeof(page_pack_t *), post_bootup_actions_cmp);
 
     menu_page_apply();
+
+    // Global and not tied to the menu being open, so settle it once here.
+    main_menu_apply_antialiasing();
 
     lv_obj_add_style(section, &style_rootmenu, LV_PART_MAIN);
     lv_obj_set_size(section, 250, MENU_SIDEBAR_HEIGHT);

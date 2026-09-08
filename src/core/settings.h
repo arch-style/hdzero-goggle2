@@ -289,14 +289,10 @@ typedef struct {
     // of once around all of them, so the input handlers get several chances
     // to run per pass instead of waiting for the whole batch.
     bool split_lock;
-    // Resample the scaled menu with nearest neighbour instead of bilinear.
-    // The scaling is what makes menu navigation heavy, and the filtering is
-    // the expensive part of it.
-    bool fast_scaling;
-    // Whether LVGL antialiases at all. Off is cheaper everywhere, not only for
-    // the scaled menu, at the cost of rougher edges. Unlike the rest of these,
-    // this one's stock value is on.
-    bool antialiasing;
+    // Turn LVGL's antialiasing off. It is what makes the scaled menu heavy,
+    // because a transformed object is resampled bilinearly with it and by
+    // nearest neighbour without. Global, so edges are rougher everywhere.
+    bool antialias_off;
 } setting_speed_t;
 
 typedef struct {

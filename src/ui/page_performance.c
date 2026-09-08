@@ -10,12 +10,12 @@
 #include "ui/ui_style.h"
 
 enum {
-    ROW_HEAD_MENU = 0,
+    ROW_HEAD_SWITCH = 0,
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
-    ROW_FAST_SCALING,
-    ROW_ANTIALIASING,
     ROW_SKIP_AUDIO,
+    ROW_HEAD_MENU,
+    ROW_ANTIALIAS_OFF,
     ROW_HEAD_BOOT,
     ROW_BOOT_DISPLAY,
     ROW_BOOT_FONTS,
@@ -43,8 +43,7 @@ enum {
 #define SAVING_SPLIT_LOCK   "10 unlocks"
 #define SAVING_BUTTON_BEEP  "50 / 200ms"
 #define SAVING_DIAL_BEEP    "15ms"
-#define SAVING_ANTIALIAS    "off is cheaper"
-#define SAVING_FAST_SCALING "no filtering"
+#define SAVING_ANTIALIAS    "faster redraw"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
 // first button's arrow at the start of column 2, so column 1 has to be wider
@@ -84,7 +83,6 @@ static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_button_beep;
 static btn_group_t btn_group_dial_beep;
 static btn_group_t btn_group_antialias;
-static btn_group_t btn_group_fast_scaling;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
 
@@ -121,6 +119,9 @@ static const char *perf_comment_text(int row) {
         // the display setup, because there is nothing yet to hold on to.
         return _lang("Takes effect from the second switch onward.");
     }
+
+    if (row <= ROW_ANTIALIAS_OFF)
+        return _lang("Applies to all drawing, not only the menu.");
 
     if (row <= ROW_BOOT_FONTS)
         return _lang("Applies at the next start-up.");
@@ -171,17 +172,17 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_heading(cont, arr, _lang("Menu / Video Switch"), ROW_HEAD_MENU);
+    create_heading(cont, arr, _lang("Menu / Video Switch"), ROW_HEAD_SWITCH);
     create_toggle(&btn_group_tuner, cont, "Keep Tuner Alive",
                   g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     create_toggle(&btn_group_overlay, cont, "Menu Over Video",
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
-    create_toggle(&btn_group_fast_scaling, cont, "Fast Menu Scaling",
-                  g_setting.speed.fast_scaling, SAVING_FAST_SCALING, ROW_FAST_SCALING);
-    create_toggle(&btn_group_antialias, cont, "Antialiasing",
-                  g_setting.speed.antialiasing, SAVING_ANTIALIAS, ROW_ANTIALIASING);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
+
+    create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
+    create_toggle(&btn_group_antialias, cont, "Antialiasing OFF",
+                  g_setting.speed.antialias_off, SAVING_ANTIALIAS, ROW_ANTIALIAS_OFF);
 
     create_heading(cont, arr, _lang("Boot"), ROW_HEAD_BOOT);
     create_toggle(&btn_group_boot_display, cont, "Skip Display Setup",
@@ -268,10 +269,6 @@ static void on_click(uint8_t key, int sel) {
         toggle_setting(&btn_group_overlay, &g_setting.speed.keep_display, "keep_display");
         break;
 
-    case ROW_FAST_SCALING:
-        toggle_setting(&btn_group_fast_scaling, &g_setting.speed.fast_scaling, "fast_scaling");
-        break;
-
     case ROW_SKIP_AUDIO:
         toggle_setting(&btn_group_audio, &g_setting.speed.skip_audio, "skip_audio");
         break;
@@ -300,8 +297,8 @@ static void on_click(uint8_t key, int sel) {
         toggle_setting(&btn_group_split_lock, &g_setting.speed.split_lock, "split_lock");
         break;
 
-    case ROW_ANTIALIASING:
-        toggle_setting(&btn_group_antialias, &g_setting.speed.antialiasing, "antialiasing");
+    case ROW_ANTIALIAS_OFF:
+        toggle_setting(&btn_group_antialias, &g_setting.speed.antialias_off, "antialias_off");
         main_menu_apply_antialiasing();
         break;
 

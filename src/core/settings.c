@@ -94,8 +94,16 @@ const setting_t g_setting_defaults = {
         .no_dial = 0,
     },
     .speed = {
-        .fast_menu = false, .keep_display = false, .skip_audio = false, .boot_display = false, .boot_fonts = false, .ui_throttle = false, .label_diff = false, .timed_long_press = false, .split_lock = false, .fast_scaling = false,
-        .antialiasing = true, // what LVGL does by default
+        .fast_menu = false,
+        .keep_display = false,
+        .skip_audio = false,
+        .boot_display = false,
+        .boot_fonts = false,
+        .ui_throttle = false,
+        .label_diff = false,
+        .timed_long_press = false,
+        .split_lock = false,
+        .antialias_off = false,
     },
     .input = {
         .button_beep = false,
@@ -524,8 +532,7 @@ void settings_load(void) {
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
-    g_setting.speed.fast_scaling = settings_get_bool("speed", "fast_scaling", g_setting_defaults.speed.fast_scaling);
-    g_setting.speed.antialiasing = settings_get_bool("speed", "antialiasing", g_setting_defaults.speed.antialiasing);
+    g_setting.speed.antialias_off = settings_get_bool("speed", "antialias_off", g_setting_defaults.speed.antialias_off);
 
     // input feedback
     g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);
