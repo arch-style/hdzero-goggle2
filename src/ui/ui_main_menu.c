@@ -84,8 +84,9 @@ static page_pack_t *page_packs[] = {
 // Entries belonging to the stock first page.
 #define MENU_STOCK_COUNT (PAGE_COUNT - 2)
 
-// Height the sidebar is given in main_menu_init().
-#define MENU_SIDEBAR_HEIGHT 975
+// The sidebar fills the menu, which starts below the status bar.
+#define MENU_POS_Y          96
+#define MENU_SIDEBAR_HEIGHT (DRAW_VER_RES_FHD - MENU_POS_Y)
 
 // The sidebar is a fixed height, so the entries have to shrink as pages are
 // added rather than the last one dropping off the bottom. Never looser than
@@ -344,7 +345,6 @@ static void menu_reinit(void) {
 // page. Scaling is about the object's top-left, so its own offset is scaled
 // by hand to keep the whole thing on screen.
 #define MENU_POS_X 250
-#define MENU_POS_Y 96
 
 static lv_coord_t menu_design_ver_res = 0;
 
@@ -356,8 +356,10 @@ static void main_menu_fit_display(void) {
     // 1080p layout onto the smaller screen: the bar sits at the origin so it
     // needs no repositioning, and the menu's offset scales with it. Derived
     // from the visible height, the canvas less the overscan margin.
+    // Rounded up: overshooting clips a couple of rows of plain background off
+    // the bottom, where rounding down would leave a visible gap instead.
     if (menu_design_ver_res > 0 && ver_res < menu_design_ver_res)
-        zoom = ((ver_res - DISP_OVERSCAN) * LV_IMG_ZOOM_NONE) / menu_design_ver_res;
+        zoom = ((ver_res - DISP_OVERSCAN) * LV_IMG_ZOOM_NONE + menu_design_ver_res - 1) / menu_design_ver_res;
 
     lv_obj_set_style_transform_zoom(menu, zoom, 0);
     lv_obj_set_pos(menu,
@@ -459,10 +461,10 @@ void main_menu_init(void) {
     menu_page_apply();
 
     lv_obj_add_style(section, &style_rootmenu, LV_PART_MAIN);
-    lv_obj_set_size(section, 250, 975);
+    lv_obj_set_size(section, 250, MENU_SIDEBAR_HEIGHT);
     lv_obj_set_pos(section, 0, 0);
 
-    lv_obj_set_size(root_page, 250, 975);
+    lv_obj_set_size(root_page, 250, MENU_SIDEBAR_HEIGHT);
     lv_obj_set_pos(root_page, 0, 0);
     lv_obj_set_style_border_width(root_page, 0, 0);
     lv_obj_set_style_radius(root_page, 0, 0);
