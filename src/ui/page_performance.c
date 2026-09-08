@@ -47,9 +47,21 @@ enum {
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
 // 51 rather than 60: thirteen rows plus a note is more than the stock page
 // height allows at the usual spacing.
-// 47 rather than 60: sixteen rows plus a note is well past what the stock
-// page height allows at the usual spacing.
-static lv_coord_t row_dsc[] = {47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, LV_GRID_TEMPLATE_LAST};
+// This page has more rows than fit however they are sized, so rather than
+// shrinking them until the estimate of the visible area happens to hold --
+// an estimate that has been wrong more than once here -- the container
+// scrolls and the dial brings the selection into view.
+#define PERF_ROW_H 51
+
+// Height that is known to render: the favourites page puts its last row at
+// 672 and that is on screen, so ending at 660 is inside proven ground.
+#define PERF_VISIBLE_H 600
+
+static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -63,6 +75,7 @@ static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_click_beep;
 static btn_group_t btn_group_long_beep;
 static btn_group_t btn_group_fast_scaling;
+static lv_obj_t *perf_cont;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
@@ -108,11 +121,15 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
-    lv_obj_set_size(cont, 960, 894);
+    lv_obj_set_size(cont, 960, PERF_VISIBLE_H);
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_layout(cont, LV_LAYOUT_GRID);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_style(cont, &style_context, LV_PART_MAIN);
+
+    // Taller than it is, so it scrolls; on_roller keeps the selection in view.
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
+    perf_cont = cont;
 
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
@@ -182,6 +199,19 @@ static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
     toggle_setting_in("speed", group, value, key);
 }
 
+// The framework has already moved the selection by the time this runs.
+static void on_roller(uint8_t key) {
+    lv_obj_t *panel = pp_performance.p_arr.panel[pp_performance.p_arr.cur];
+
+    if (panel)
+        lv_obj_scroll_to_view(panel, LV_ANIM_OFF);
+}
+
+static void on_enter(void) {
+    if (perf_cont)
+        lv_obj_scroll_to(perf_cont, 0, 0, LV_ANIM_OFF);
+}
+
 static void on_click(uint8_t key, int sel) {
     switch (sel) {
     case ROW_FAST_MENU:
@@ -244,11 +274,11 @@ page_pack_t pp_performance = {
     },
     .name = "Performance",
     .create = page_performance_create,
-    .enter = NULL,
+    .enter = on_enter,
     .exit = NULL,
     .on_created = NULL,
     .on_update = NULL,
-    .on_roller = NULL,
+    .on_roller = on_roller,
     .on_click = on_click,
     .on_right_button = NULL,
 };
