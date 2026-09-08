@@ -29,7 +29,7 @@ typedef struct {
     void (*on_right_button)(bool is_short);
 
     int32_t post_bootup_run_priority;
-    void (*post_bootup_run_function)(void(*complete_callback)());
+    void (*post_bootup_run_function)(void (*complete_callback)());
 } page_pack_t;
 
 typedef struct {
@@ -43,6 +43,8 @@ extern progress_bar_t progress_bar;
 void main_menu_init();
 void main_menu_update();
 void main_menu_show(bool is_show);
+// Re-resolve the antialias flag after the setting behind it changed.
+void main_menu_apply_antialiasing(void);
 bool main_menu_is_shown(void);
 
 void menu_nav(uint8_t key);

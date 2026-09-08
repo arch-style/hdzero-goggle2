@@ -357,6 +357,22 @@ static void menu_reinit(void) {
 #define MENU_POS_X 250
 
 static lv_coord_t menu_design_ver_res = 0;
+static bool menu_scaled = false;
+
+bool main_menu_is_shown(void);
+
+// Two things ask about antialiasing: the global setting, and Fast Menu Scaling
+// which drops it while the menu is scaled because the resampling is what makes
+// navigation heavy. Resolve both in one place so neither can leave the flag
+// somewhere the other did not intend.
+void main_menu_apply_antialiasing(void) {
+    bool want = g_setting.speed.antialiasing;
+
+    if (menu_scaled && main_menu_is_shown() && g_setting.speed.fast_scaling)
+        want = false;
+
+    lvgl_set_antialiasing(want);
+}
 
 static void main_menu_fit_display(void) {
     lv_coord_t ver_res = lv_disp_get_ver_res(NULL);
@@ -378,9 +394,8 @@ static void main_menu_fit_display(void) {
 
     statusbar_set_zoom(zoom);
 
-    // Only matters while something is actually scaled, but setting it here
-    // keeps it next to the decision it belongs to.
-    lvgl_set_antialiasing(!(zoom != LV_IMG_ZOOM_NONE && g_setting.speed.fast_scaling));
+    menu_scaled = (zoom != LV_IMG_ZOOM_NONE);
+    main_menu_apply_antialiasing();
 
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
@@ -397,11 +412,9 @@ void main_menu_show(bool is_show) {
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
-        // Fast Menu Scaling turns the driver's antialias flag off for the
-        // scaled menu. Nothing else here is transformed, but the flag is
-        // global, so put it back rather than leaving video and the OSD
-        // rendering under a setting the menu asked for.
-        lvgl_set_antialiasing(true);
+        // Fast Menu Scaling only applies while the menu is up, so leaving it
+        // hidden must fall back to whatever the global setting says.
+        main_menu_apply_antialiasing();
     }
 }
 

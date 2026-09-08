@@ -94,20 +94,12 @@ const setting_t g_setting_defaults = {
         .no_dial = 0,
     },
     .speed = {
-        .fast_menu = false,
-        .keep_display = false,
-        .skip_audio = false,
-        .boot_display = false,
-        .boot_fonts = false,
-        .ui_throttle = false,
-        .label_diff = false,
-        .timed_long_press = false,
-        .split_lock = false,
-        .fast_scaling = false,
+        .fast_menu = false, .keep_display = false, .skip_audio = false, .boot_display = false, .boot_fonts = false, .ui_throttle = false, .label_diff = false, .timed_long_press = false, .split_lock = false, .fast_scaling = false,
+        .antialiasing = true, // what LVGL does by default
     },
     .input = {
-        .click_beep = false,
-        .long_press_beep = false,
+        .button_beep = false,
+        .dial_beep = false,
     },
     .osd = {
         .orbit = 2,
@@ -533,10 +525,11 @@ void settings_load(void) {
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
     g_setting.speed.fast_scaling = settings_get_bool("speed", "fast_scaling", g_setting_defaults.speed.fast_scaling);
+    g_setting.speed.antialiasing = settings_get_bool("speed", "antialiasing", g_setting_defaults.speed.antialiasing);
 
     // input feedback
-    g_setting.input.click_beep = settings_get_bool("input", "click_beep", g_setting_defaults.input.click_beep);
-    g_setting.input.long_press_beep = settings_get_bool("input", "long_press_beep", g_setting_defaults.input.long_press_beep);
+    g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);
+    g_setting.input.dial_beep = settings_get_bool("input", "dial_beep", g_setting_defaults.input.dial_beep);
     LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s ui_throttle=%s",
          g_setting.speed.fast_menu ? "on" : "off",
          g_setting.speed.keep_display ? "on" : "off",

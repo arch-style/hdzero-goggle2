@@ -14,6 +14,7 @@ enum {
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
     ROW_FAST_SCALING,
+    ROW_ANTIALIASING,
     ROW_SKIP_AUDIO,
     ROW_HEAD_BOOT,
     ROW_BOOT_DISPLAY,
@@ -23,8 +24,8 @@ enum {
     ROW_LABEL_DIFF,
     ROW_TIMED_LONG_PRESS,
     ROW_SPLIT_LOCK,
-    ROW_CLICK_BEEP,
-    ROW_LONG_PRESS_BEEP,
+    ROW_BUTTON_BEEP,
+    ROW_DIAL_BEEP,
     ROW_BACK,
     ROW_COUNT
 };
@@ -40,8 +41,9 @@ enum {
 #define SAVING_LABEL_DIFF   "no redraw"
 #define SAVING_LONG_PRESS   "500ms fixed"
 #define SAVING_SPLIT_LOCK   "10 unlocks"
-#define SAVING_CLICK_BEEP   "50ms beep"
-#define SAVING_LONG_BEEP    "200ms beep"
+#define SAVING_BUTTON_BEEP  "50 / 200ms"
+#define SAVING_DIAL_BEEP    "15ms"
+#define SAVING_ANTIALIAS    "off is cheaper"
 #define SAVING_FAST_SCALING "no filtering"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
@@ -68,7 +70,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -79,8 +81,9 @@ static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
 static btn_group_t btn_group_split_lock;
-static btn_group_t btn_group_click_beep;
-static btn_group_t btn_group_long_beep;
+static btn_group_t btn_group_button_beep;
+static btn_group_t btn_group_dial_beep;
+static btn_group_t btn_group_antialias;
 static btn_group_t btn_group_fast_scaling;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
@@ -122,7 +125,7 @@ static const char *perf_comment_text(int row) {
     if (row <= ROW_BOOT_FONTS)
         return _lang("Applies at the next start-up.");
 
-    if (row <= ROW_LONG_PRESS_BEEP)
+    if (row <= ROW_DIAL_BEEP)
         return _lang("Applies immediately.");
 
     return _lang("All off is the original behaviour.");
@@ -175,6 +178,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
     create_toggle(&btn_group_fast_scaling, cont, "Fast Menu Scaling",
                   g_setting.speed.fast_scaling, SAVING_FAST_SCALING, ROW_FAST_SCALING);
+    create_toggle(&btn_group_antialias, cont, "Antialiasing",
+                  g_setting.speed.antialiasing, SAVING_ANTIALIAS, ROW_ANTIALIASING);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
 
@@ -193,10 +198,10 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.timed_long_press, SAVING_LONG_PRESS, ROW_TIMED_LONG_PRESS);
     create_toggle(&btn_group_split_lock, cont, "Split UI Lock",
                   g_setting.speed.split_lock, SAVING_SPLIT_LOCK, ROW_SPLIT_LOCK);
-    create_toggle(&btn_group_click_beep, cont, "Click Beep",
-                  g_setting.input.click_beep, SAVING_CLICK_BEEP, ROW_CLICK_BEEP);
-    create_toggle(&btn_group_long_beep, cont, "Long Press Beep",
-                  g_setting.input.long_press_beep, SAVING_LONG_BEEP, ROW_LONG_PRESS_BEEP);
+    create_toggle(&btn_group_button_beep, cont, "Button Beep",
+                  g_setting.input.button_beep, SAVING_BUTTON_BEEP, ROW_BUTTON_BEEP);
+    create_toggle(&btn_group_dial_beep, cont, "Dial Beep",
+                  g_setting.input.dial_beep, SAVING_DIAL_BEEP, ROW_DIAL_BEEP);
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
@@ -210,6 +215,7 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_text_align(perf_comment, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_color(perf_comment, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_pad_left(perf_comment, 90, 0);
+    lv_obj_set_style_pad_top(perf_comment, PERF_ROW_H, 0); // a row clear of the list
     lv_label_set_long_mode(perf_comment, LV_LABEL_LONG_WRAP);
     perf_comment_update();
 
@@ -294,12 +300,17 @@ static void on_click(uint8_t key, int sel) {
         toggle_setting(&btn_group_split_lock, &g_setting.speed.split_lock, "split_lock");
         break;
 
-    case ROW_CLICK_BEEP:
-        toggle_setting_in("input", &btn_group_click_beep, &g_setting.input.click_beep, "click_beep");
+    case ROW_ANTIALIASING:
+        toggle_setting(&btn_group_antialias, &g_setting.speed.antialiasing, "antialiasing");
+        main_menu_apply_antialiasing();
         break;
 
-    case ROW_LONG_PRESS_BEEP:
-        toggle_setting_in("input", &btn_group_long_beep, &g_setting.input.long_press_beep, "long_press_beep");
+    case ROW_BUTTON_BEEP:
+        toggle_setting_in("input", &btn_group_button_beep, &g_setting.input.button_beep, "button_beep");
+        break;
+
+    case ROW_DIAL_BEEP:
+        toggle_setting_in("input", &btn_group_dial_beep, &g_setting.input.dial_beep, "dial_beep");
         break;
 
     default:

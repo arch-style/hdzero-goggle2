@@ -65,17 +65,26 @@ static uint16_t tune_timer = 0;
 // delay plus nine 33ms repeats.
 #define LONG_PRESS_MS 500
 
-// Audible confirmation that a press registered. beep_dur() hands the work to
-// its own thread, so these do not hold up the input loop. Two lengths, so a
-// long press is distinguishable from a short one by ear alone.
+// A dial step is much shorter than a press, because the dial turns quickly and
+// 50ms of beep per detent would run into the next one.
+#define BEEP_DIAL 15
+
+// Audible confirmation that an input registered. beep_dur() hands the work to
+// its own thread, so none of these hold up the input loop. Three lengths, so
+// a short press, a long press and a dial step are told apart by ear alone.
 static void input_click_feedback(void) {
-    if (g_setting.input.click_beep)
+    if (g_setting.input.button_beep)
         beep_dur(BEEP_SHORT);
 }
 
 static void input_long_press_feedback(void) {
-    if (g_setting.input.long_press_beep)
+    if (g_setting.input.button_beep)
         beep_dur(BEEP_LONG);
+}
+
+static void input_dial_feedback(void) {
+    if (g_setting.input.dial_beep)
+        beep_dur(BEEP_DIAL);
 }
 
 static int epfd;
@@ -347,6 +356,12 @@ void rbtn_click(right_button_t click_type) {
     if (g_app_state == APP_STATE_USER_INPUT_DISABLED)
         return;
 
+    // The right button is a press like any other, so it gets the same beep.
+    if (click_type == RIGHT_LONG_PRESS)
+        input_long_press_feedback();
+    else
+        input_click_feedback();
+
     pthread_mutex_lock(&lvgl_mutex);
 
     switch (g_app_state) {
@@ -386,6 +401,8 @@ static void roller_up(void) {
     if (g_app_state == APP_STATE_USER_INPUT_DISABLED)
         return;
 
+    input_dial_feedback();
+
     pthread_mutex_lock(&lvgl_mutex);
     autoscan_exit();
     if (g_app_state == APP_STATE_MAINMENU) // main menu
@@ -420,6 +437,8 @@ static void roller_down(void) {
 
     if (g_app_state == APP_STATE_USER_INPUT_DISABLED)
         return;
+
+    input_dial_feedback();
 
     pthread_mutex_lock(&lvgl_mutex);
     autoscan_exit();

@@ -293,14 +293,19 @@ typedef struct {
     // The scaling is what makes menu navigation heavy, and the filtering is
     // the expensive part of it.
     bool fast_scaling;
+    // Whether LVGL antialiases at all. Off is cheaper everywhere, not only for
+    // the scaled menu, at the cost of rougher edges. Unlike the rest of these,
+    // this one's stock value is on.
+    bool antialiasing;
 } setting_speed_t;
 
 typedef struct {
-    // Beep when a short press is recognised, which happens on release.
-    bool click_beep;
-    // Beep when a long press reaches its threshold, so it is audible that the
-    // press has registered without waiting to see what it did.
-    bool long_press_beep;
+    // Beep on every recognised button press: the dial button short and long,
+    // and the right button. A long press gets a longer beep so the two are
+    // distinguishable by ear.
+    bool button_beep;
+    // Beep on every dial step. Short, because the dial turns quickly.
+    bool dial_beep;
 } setting_input_t;
 
 typedef enum {
