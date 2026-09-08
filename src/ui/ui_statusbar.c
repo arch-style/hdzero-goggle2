@@ -38,8 +38,17 @@ LV_IMG_DECLARE(img_sdcard);
 LV_IMG_DECLARE(img_noSdcard);
 
 static lv_obj_t *img_battery;
+static lv_obj_t *statusbar_cont;
 LV_IMG_DECLARE(img_bat);
 LV_IMG_DECLARE(img_lowBattery);
+
+// The bar is laid out full width for 1080p, so at 720p a third of it, the
+// right hand icons included, falls off the screen. It sits at the origin, so
+// scaling it needs no repositioning.
+void statusbar_set_zoom(lv_coord_t zoom) {
+    if (statusbar_cont)
+        lv_obj_set_style_transform_zoom(statusbar_cont, zoom, 0);
+}
 
 int statusbar_init(void) {
     char buf[128];
@@ -49,6 +58,7 @@ int statusbar_init(void) {
 
     /*Create a container with grid*/
     lv_obj_t *cont = lv_obj_create(lv_scr_act());
+    statusbar_cont = cont;
     lv_obj_set_size(cont, DRAW_HOR_RES_FHD, 96);
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_layout(cont, LV_LAYOUT_GRID);

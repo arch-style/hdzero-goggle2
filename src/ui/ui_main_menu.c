@@ -37,6 +37,7 @@
 #include "ui/ui_image_setting.h"
 #include "ui/ui_keyboard.h"
 #include "ui/ui_porting.h"
+#include "ui/ui_statusbar.h"
 #include "ui/ui_style.h"
 
 LV_IMG_DECLARE(img_arrow);
@@ -349,25 +350,21 @@ static lv_coord_t menu_design_ver_res = 0;
 
 static void main_menu_fit_display(void) {
     lv_coord_t ver_res = lv_disp_get_ver_res(NULL);
-    lv_coord_t hor_res = lv_disp_get_hor_res(NULL);
     lv_coord_t zoom = LV_IMG_ZOOM_NONE;
 
-    // The status bar is a sibling, fixed at the top and never scaled, so the
-    // menu keeps its original offset below it and fits into what is left
-    // rather than scaling the offset too.
+    // Menu and status bar are scaled by the same factor, which maps the whole
+    // 1080p layout onto the smaller screen: the bar sits at the origin so it
+    // needs no repositioning, and the menu's offset scales with it. Derived
+    // from the visible height, the canvas less the overscan margin.
     if (menu_design_ver_res > 0 && ver_res < menu_design_ver_res)
-        zoom = ((ver_res - MENU_POS_Y) * LV_IMG_ZOOM_NONE) / (menu_design_ver_res - MENU_POS_Y);
+        zoom = ((ver_res - DISP_OVERSCAN) * LV_IMG_ZOOM_NONE) / menu_design_ver_res;
 
     lv_obj_set_style_transform_zoom(menu, zoom, 0);
+    lv_obj_set_pos(menu,
+                   (MENU_POS_X * zoom) / LV_IMG_ZOOM_NONE,
+                   (MENU_POS_Y * zoom) / LV_IMG_ZOOM_NONE);
 
-    if (zoom == LV_IMG_ZOOM_NONE) {
-        lv_obj_set_pos(menu, MENU_POS_X, MENU_POS_Y);
-    } else {
-        // Scaling is about the top-left corner, so centre what is left of the
-        // width by hand instead of leaving it hard against the old offset.
-        lv_coord_t scaled_w = (lv_obj_get_width(menu) * zoom) / LV_IMG_ZOOM_NONE;
-        lv_obj_set_pos(menu, (hor_res - DISP_OVERSCAN - scaled_w) / 2, MENU_POS_Y);
-    }
+    statusbar_set_zoom(zoom);
 
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
