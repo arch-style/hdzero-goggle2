@@ -185,6 +185,11 @@ static void ui_draw_timed(void) {
 }
 
 int main(int argc, char *argv[]) {
+    // Anchored here so the total covers everything, device_init() included.
+    // Started after that, it missed the very work Async Motion Sensor moves
+    // and reported a 169ms change for what was really 641ms.
+    uint32_t boot_start_ms = time_ms();
+
     pthread_mutex_init(&lvgl_mutex, NULL);
 
 #ifdef EMULATOR_BUILD
@@ -223,8 +228,6 @@ int main(int argc, char *argv[]) {
     osd_font_prefetch_start();
 
     // 4. Initilize UI
-    uint32_t boot_start_ms = time_ms();
-
     uint32_t phase_ms = time_ms();
     uint32_t step_ms = phase_ms;
     lvgl_init();
