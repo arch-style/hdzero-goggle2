@@ -44,7 +44,7 @@ enum {
 #define SAVING_BOOT_DISPLAY   "-1140ms"
 #define SAVING_BOOT_FONTS     "-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
-#define SAVING_DEFER_MENU     "-577ms"
+#define SAVING_DEFER_MENU     "no gain now"
 #define SAVING_UI_THROTTLE    "200Hz > 20Hz"
 #define SAVING_LABEL_DIFF     "no redraw"
 #define SAVING_LONG_PRESS     "500ms fixed"
@@ -166,7 +166,10 @@ static const char *perf_comment_text(int row) {
         return _lang("The menu is on screen during start-up until the video covers it.");
 
     case ROW_DEFER_MENU:
-        return _lang("Built after the video instead. Not used when start-up ends in the menu.");
+        // Measured: 5756ms to video with it off, 6197ms with it on. Building
+        // the menu was filling the wait for the font preload, and removing it
+        // only exposed that wait.
+        return _lang("No gain while Preload OSD Fonts is on: it was covering that wait.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
