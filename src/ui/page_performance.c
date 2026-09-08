@@ -19,6 +19,9 @@ enum {
     ROW_BOOT_FONTS,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
+    ROW_LABEL_DIFF,
+    ROW_TIMED_LONG_PRESS,
+    ROW_SPLIT_LOCK,
     ROW_BACK,
     ROW_COUNT
 };
@@ -31,9 +34,14 @@ enum {
 #define SAVING_BOOT_DISPLAY "-1140ms"
 #define SAVING_BOOT_FONTS   "-1000ms"
 #define SAVING_UI_THROTTLE  "200Hz > 20Hz"
+#define SAVING_LABEL_DIFF   "no idle redraw"
+#define SAVING_LONG_PRESS   "500ms, steady"
+#define SAVING_SPLIT_LOCK   "10 unlocks/pass"
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
-static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
+// 51 rather than 60: thirteen rows plus a note is more than the stock page
+// height allows at the usual spacing.
+static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -41,6 +49,9 @@ static btn_group_t btn_group_audio;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_ui_throttle;
+static btn_group_t btn_group_label_diff;
+static btn_group_t btn_group_long_press;
+static btn_group_t btn_group_split_lock;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
@@ -75,11 +86,12 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(page, 1053, 900);
     lv_obj_add_style(page, &style_subpage, LV_PART_MAIN);
-    lv_obj_set_style_pad_top(page, 94, 0);
+    lv_obj_set_style_pad_top(page, 24, 0); // this page is taller than most
 
     lv_obj_t *section = lv_menu_section_create(page);
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1053, 894);
+    lv_obj_set_style_pad_top(section, 36, 0);
 
     snprintf(buf, sizeof(buf), "%s:", _lang("Performance"));
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
@@ -113,6 +125,12 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
                   g_setting.speed.ui_throttle, SAVING_UI_THROTTLE, ROW_UI_THROTTLE);
+    create_toggle(&btn_group_label_diff, cont, "Skip Idle Redraws",
+                  g_setting.speed.label_diff, SAVING_LABEL_DIFF, ROW_LABEL_DIFF);
+    create_toggle(&btn_group_long_press, cont, "Timed Long Press",
+                  g_setting.speed.timed_long_press, SAVING_LONG_PRESS, ROW_TIMED_LONG_PRESS);
+    create_toggle(&btn_group_split_lock, cont, "Split UI Lock",
+                  g_setting.speed.split_lock, SAVING_SPLIT_LOCK, ROW_SPLIT_LOCK);
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
@@ -167,6 +185,18 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_UI_THROTTLE:
         toggle_setting(&btn_group_ui_throttle, &g_setting.speed.ui_throttle, "ui_throttle");
+        break;
+
+    case ROW_LABEL_DIFF:
+        toggle_setting(&btn_group_label_diff, &g_setting.speed.label_diff, "label_diff");
+        break;
+
+    case ROW_TIMED_LONG_PRESS:
+        toggle_setting(&btn_group_long_press, &g_setting.speed.timed_long_press, "timed_long_press");
+        break;
+
+    case ROW_SPLIT_LOCK:
+        toggle_setting(&btn_group_split_lock, &g_setting.speed.split_lock, "split_lock");
         break;
 
     default:

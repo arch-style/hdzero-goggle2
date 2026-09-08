@@ -276,6 +276,19 @@ typedef struct {
     // main loop pass. They rewrite their labels every time, and a rewrite
     // invalidates them whether the text changed or not.
     bool ui_throttle;
+    // Only write a label or image when its content actually changed.
+    // lv_label_set_text() invalidates unconditionally, and the status bar
+    // rewrites every field on every pass, so an idle bar was redrawing
+    // constantly for nothing.
+    bool label_diff;
+    // Decide a long press by elapsed time rather than by counting the key
+    // repeat events the kernel happens to send, which ties the feel of the
+    // button to the autorepeat rate.
+    bool timed_long_press;
+    // Take and release lvgl_mutex around each stage of the main loop instead
+    // of once around all of them, so the input handlers get several chances
+    // to run per pass instead of waiting for the whole batch.
+    bool split_lock;
 } setting_speed_t;
 
 typedef enum {

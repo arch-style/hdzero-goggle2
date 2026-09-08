@@ -49,6 +49,7 @@
 #include "ui/ui_main_menu.h"
 #include "ui/ui_osd_element_pos.h"
 #include "ui/ui_porting.h"
+#include "util/time.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Tune channel on video mode
@@ -58,6 +59,10 @@ static uint8_t tune_state = 0; // 0=init; 1=waiting for key; 2=tuning
 static uint16_t tune_timer = 0;
 
 #define EPOLL_FD_CNT 4
+
+// Roughly what the counted-repeats rule worked out to: a 250ms autorepeat
+// delay plus nine 33ms repeats.
+#define LONG_PRESS_MS 500
 
 static int epfd;
 static pthread_t input_device_pid;
@@ -429,6 +434,8 @@ static void get_event(int fd) {
     static int event_type_last = 0;
     static int btn_value = 0;
     static int btn_press_time = 0;
+    static uint32_t btn_down_ms = 0;
+    static bool btn_long_fired = false;
 
     static int roller_value = 0;
 
@@ -456,7 +463,32 @@ static void get_event(int fd) {
                     roller_down_acc = 0;
                 }
             } else if (event_type_last == EV_KEY) {
-                if (btn_value) {
+                if (g_setting.speed.timed_long_press) {
+                    // The stock rule counts the key repeats the kernel sends
+                    // while the button is held and fires on the tenth, so how
+                    // long a long press takes is really the autorepeat rate.
+                    // Time it instead. The repeats are still what brings us
+                    // back here to check, but they no longer set the
+                    // threshold. Equality on the count also meant a missed
+                    // tenth event lost the press entirely; a flag cannot.
+                    if (btn_value) {
+                        if (btn_down_ms == 0)
+                            btn_down_ms = time_ms();
+
+                        if (!btn_long_fired && (time_ms() - btn_down_ms) >= LONG_PRESS_MS) {
+                            btn_long_fired = true;
+                            btn_press();
+                            g_key = DIAL_KEY_PRESS;
+                        }
+                    } else {
+                        if (!btn_long_fired && btn_down_ms != 0) {
+                            btn_click();
+                            g_key = DIAL_KEY_CLICK;
+                        }
+                        btn_down_ms = 0;
+                        btn_long_fired = false;
+                    }
+                } else if (btn_value) {
                     if (btn_press_time == 10) {
                         btn_press();
                         g_key = DIAL_KEY_PRESS;

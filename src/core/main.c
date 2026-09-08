@@ -237,20 +237,44 @@ int main(int argc, char *argv[]) {
                 last_slow_ms = now;
         }
 
-        pthread_mutex_lock(&lvgl_mutex);
-        main_menu_update();
-        sleep_reminder();
+        // The dial and button handlers take lvgl_mutex too, so held across the
+        // whole batch it makes them wait for a full pass. Released between the
+        // stages they get several chances per pass instead. Each stage still
+        // runs under the lock, so LVGL is never touched unprotected; what
+        // changes is that input can land between two stages rather than only
+        // between passes.
+        bool split = g_setting.speed.split_lock;
+
+#define UI_STAGE(call)                         \
+    do {                                       \
+        if (split)                             \
+            pthread_mutex_lock(&lvgl_mutex);   \
+        call;                                  \
+        if (split)                             \
+            pthread_mutex_unlock(&lvgl_mutex); \
+    } while (0)
+
+        if (!split)
+            pthread_mutex_lock(&lvgl_mutex);
+
+        UI_STAGE(main_menu_update());
+        UI_STAGE(sleep_reminder());
         if (slow_tick)
-            statubar_update();
-        osd_hdzero_update();
-        draw_hdmi_in_dvr_osd();
-        ims_update();
-        ui_osd_element_pos_update();
-        ht_detect_motion();
-        lv_timer_handler();
+            UI_STAGE(statubar_update());
+        UI_STAGE(osd_hdzero_update());
+        UI_STAGE(draw_hdmi_in_dvr_osd());
+        UI_STAGE(ims_update());
+        UI_STAGE(ui_osd_element_pos_update());
+        UI_STAGE(ht_detect_motion());
+        UI_STAGE(lv_timer_handler());
         if (slow_tick)
-            source_status_timer();
-        pthread_mutex_unlock(&lvgl_mutex);
+            UI_STAGE(source_status_timer());
+
+        if (!split)
+            pthread_mutex_unlock(&lvgl_mutex);
+
+#undef UI_STAGE
+
         usleep(5000);
         gif_cnt++;
     }

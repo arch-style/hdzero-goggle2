@@ -42,6 +42,28 @@ static lv_obj_t *statusbar_cont;
 LV_IMG_DECLARE(img_bat);
 LV_IMG_DECLARE(img_lowBattery);
 
+// lv_label_set_text() and lv_img_set_src() invalidate their object whether or
+// not the content changed, and this bar rewrites every field on every pass of
+// the main loop, so an idle bar was being redrawn for nothing. Comparing first
+// costs a strcmp and saves a redraw.
+static void sb_label(lv_obj_t *label, const char *text) {
+    if (g_setting.speed.label_diff) {
+        const char *cur = lv_label_get_text(label);
+
+        if (cur && strcmp(cur, text) == 0)
+            return;
+    }
+
+    lv_label_set_text(label, text);
+}
+
+static void sb_img(lv_obj_t *img, const lv_img_dsc_t *src) {
+    if (g_setting.speed.label_diff && lv_img_get_src(img) == src)
+        return;
+
+    lv_img_set_src(img, src);
+}
+
 // The bar is laid out full width for 1080p, so at 720p a third of it, the
 // right hand icons included, falls off the screen. It sits at the origin, so
 // scaling it needs no repositioning.
@@ -75,40 +97,40 @@ int statusbar_init(void) {
 
     LV_IMG_DECLARE(img_logo);
     lv_obj_t *img0 = lv_img_create(cont);
-    lv_img_set_src(img0, &img_logo);
+    sb_img(img0, &img_logo);
     lv_obj_set_size(img0, 264, 96);
     lv_obj_set_grid_cell(img0, LV_GRID_ALIGN_CENTER, 0, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     img_sdc = lv_img_create(cont);
-    lv_img_set_src(img_sdc, &img_sdcard);
+    sb_img(img_sdc, &img_sdcard);
     lv_obj_set_size(img_sdc, 64, 96);
     lv_obj_set_grid_cell(img_sdc, LV_GRID_ALIGN_CENTER, 1, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     LV_IMG_DECLARE(img_ic);
     lv_obj_t *img2 = lv_img_create(cont);
-    lv_img_set_src(img2, &img_ic);
+    sb_img(img2, &img_ic);
     lv_obj_set_size(img2, 64, 96);
     lv_obj_set_grid_cell(img2, LV_GRID_ALIGN_CENTER, 3, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     LV_IMG_DECLARE(img_esp);
     lv_obj_t *img3 = lv_img_create(cont);
-    lv_img_set_src(img3, &img_esp);
+    sb_img(img3, &img_esp);
     lv_obj_set_size(img3, 64, 96);
     lv_obj_set_grid_cell(img3, LV_GRID_ALIGN_CENTER, 5, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     LV_IMG_DECLARE(img_wifi);
     lv_obj_t *img4 = lv_img_create(cont);
-    lv_img_set_src(img4, &img_wifi);
+    sb_img(img4, &img_wifi);
     lv_obj_set_size(img4, 64, 96);
     lv_obj_set_grid_cell(img4, LV_GRID_ALIGN_CENTER, 7, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     img_battery = lv_img_create(cont);
-    lv_img_set_src(img_battery, &img_bat);
+    sb_img(img_battery, &img_bat);
     lv_obj_set_size(img_battery, 64, 96);
     lv_obj_set_grid_cell(img_battery, LV_GRID_ALIGN_CENTER, 9, 1,
                          LV_GRID_ALIGN_CENTER, 0, 1);
@@ -131,7 +153,7 @@ int statusbar_init(void) {
 
     snprintf(buf, sizeof(buf), "%s                 ", _lang("SD Card"));
 
-    lv_label_set_text(label[STS_SDCARD], buf);
+    sb_label(label[STS_SDCARD], buf);
     lv_label_set_recolor(label[STS_SDCARD], true);
 
     if (g_source_info.source == SOURCE_HDZERO)
@@ -149,15 +171,15 @@ int statusbar_init(void) {
     } else
         snprintf(buf, sizeof(buf), " ");
 
-    lv_label_set_text(label[STS_SOURCE], buf);
+    sb_label(label[STS_SOURCE], buf);
 
     snprintf(buf, sizeof(buf), "ELRS: %s", _lang("Off"));
-    lv_label_set_text(label[STS_ELRS], buf);
+    sb_label(label[STS_ELRS], buf);
 
     snprintf(buf, sizeof(buf), "WiFi: %s", _lang("Off"));
-    lv_label_set_text(label[STS_WIFI], buf);
+    sb_label(label[STS_WIFI], buf);
 
-    lv_label_set_text(label[STS_BATT], "       ");
+    sb_label(label[STS_BATT], "       ");
     return 0;
 }
 
@@ -167,7 +189,7 @@ void statubar_update(void) {
 
     // display battery voltage
     battery_get_voltage_str(buf);
-    lv_label_set_text(label[STS_BATT], buf);
+    sb_label(label[STS_BATT], buf);
 
     {
 #define BEEP_INTERVAL 20
@@ -175,9 +197,9 @@ void statubar_update(void) {
 
         const bool low = battery_is_low();
         if (low)
-            lv_img_set_src(img_battery, &img_lowBattery);
+            sb_img(img_battery, &img_lowBattery);
         else
-            lv_img_set_src(img_battery, &img_bat);
+            sb_img(img_battery, &img_bat);
 
         switch (g_setting.power.warning_type) {
         case SETTING_POWER_WARNING_TYPE_BEEP:
@@ -235,7 +257,7 @@ void statubar_update(void) {
         } else
             snprintf(buf, sizeof(buf), " ");
 
-        lv_label_set_text(label[STS_SOURCE], buf);
+        sb_label(label[STS_SOURCE], buf);
     }
 
     hdzero_channel_last = g_setting.scan.channel;
@@ -245,13 +267,13 @@ void statubar_update(void) {
     analog_module_last = g_setting.source.analog_module;
 
     if (page_storage_is_sd_repair_active()) {
-        lv_img_set_src(img_sdc, &img_sdcard);
-        lv_label_set_text(label[STS_SDCARD], _lang("Integrity check"));
+        sb_img(img_sdc, &img_sdcard);
+        sb_label(label[STS_SDCARD], _lang("Integrity check"));
     } else {
         if (g_sdcard_enable) {
             int cnt = get_videofile_cnt();
             float gb = sdcard_free_size() / 1024.0;
-            lv_img_set_src(img_sdc, &img_sdcard);
+            sb_img(img_sdc, &img_sdcard);
             if (cnt != 0) {
                 if (sdcard_is_full())
                     snprintf(buf, sizeof(buf), "%d %s, %s %s", cnt, _lang("clip(s)"), _lang("SD Card"), _lang("full"));
@@ -264,7 +286,7 @@ void statubar_update(void) {
                     snprintf(buf, sizeof(buf), "%.2fGB %s", gb, _lang("available"));
             }
         } else {
-            lv_img_set_src(img_sdc, &img_noSdcard);
+            sb_img(img_sdc, &img_noSdcard);
 
             if (sdcard_inserted()) {
                 strcpy(buf, _lang("Unsupported"));
@@ -273,17 +295,17 @@ void statubar_update(void) {
             }
         }
 
-        lv_label_set_text(label[STS_SDCARD], buf);
+        sb_label(label[STS_SDCARD], buf);
     }
 
     if (g_setting.elrs.enable) {
         snprintf(buf, sizeof(buf), "ELRS: %s ", _lang("On"));
-        lv_label_set_text(label[STS_ELRS], buf);
+        sb_label(label[STS_ELRS], buf);
     } else {
         snprintf(buf, sizeof(buf), "ELRS: %s ", _lang("Off"));
-        lv_label_set_text(label[STS_ELRS], buf);
+        sb_label(label[STS_ELRS], buf);
     }
 
     page_wifi_get_statusbar_text(buf, sizeof(buf));
-    lv_label_set_text(label[STS_WIFI], buf);
+    sb_label(label[STS_WIFI], buf);
 }
