@@ -270,6 +270,9 @@ static void page_wifi_mask_password(lv_obj_t *obj, int size) {
  *  Note: This function will be invoked asynchronously post bootup and may
  *        require additional APP_STATE checks to ensure integrity of execution.
  */
+// Set for the one call made from the post-bootup action.
+static bool booting = false;
+
 static void page_wifi_update_settings() {
     g_setting.wifi.enable = btn_group_get_sel(&page_wifi.page_1.enable.button) == 0;
     g_setting.wifi.mode = btn_group_get_sel(&page_wifi.page_1.mode.button);
@@ -306,8 +309,17 @@ static void page_wifi_update_settings() {
     ini_puts("wifi", "root_pw", g_setting.wifi.root_pw, SETTING_INI);
     settings_put_bool("wifi", "ssh", g_setting.wifi.ssh);
 
-    // Prepare WiFi interfaces
-    system_script(WIFI_OFF);
+    // Prepare WiFi interfaces. At start-up the driver is normally not
+    // loaded and nothing the script kills is running, yet its sleep still
+    // costs a second of main loop right after the picture appears. The module
+    // check keeps the stop for the one case it matters, an app restart with
+    // WiFi left up.
+    bool driver_loaded = (access("/sys/module/xradio_wlan", F_OK) == 0);
+
+    if (booting && g_setting.speed.skip_wifi_stop && !driver_loaded)
+        LOGI("wifi: stop skipped at start-up, driver not loaded");
+    else
+        system_script(WIFI_OFF);
     page_wifi_update_services();
 
     // Activate WiFi interface
@@ -1151,7 +1163,9 @@ static void page_wifi_on_right_button(bool is_short) {
 }
 
 void page_wifi_post_bootup_action(void (*complete_callback)()) {
+    booting = true;
     page_wifi_update_settings();
+    booting = false;
 
     if (complete_callback != NULL) {
         complete_callback();

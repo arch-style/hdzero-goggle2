@@ -1,5 +1,6 @@
 #include "dm6302.h"
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include <log/log.h>
 
 #include "../core/common.hh"
+#include "../core/settings.h"
 #include "defines.h"
 #include "dm5680.h"
 #include "i2c.h"
@@ -17,18 +19,45 @@
 
 #define WAIT(ms) usleep((ms)*1000)
 
+// One SPI access is a sequence of FPGA register writes and reads, and only
+// the individual I2C transfers are serialised by i2c_mutex. Two threads
+// interleaving their sequences would mix up the bridge, so the sequence as a
+// whole is serialised here. Needed once the tuner init runs on a worker.
+static pthread_mutex_t spi_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// The burst is a single ioctl carrying every register write of the sequence;
+// the driver sends them with a repeated START between. If the kernel or the
+// FPGA refuses it the sequence is redone one write at a time and the burst is
+// not tried again, so a refusal costs one failed ioctl for the session.
+static bool spi_burst_refused = false;
+
+static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t count) {
+    if (g_setting.speed.spi_burst && !spi_burst_refused) {
+        if (I2C_Write_Burst(ADDR_FPGA, regs, vals, count) == 0)
+            return true;
+
+        spi_burst_refused = true;
+        LOGE("SPI: burst write refused, back to one register per transfer");
+    }
+
+    for (uint8_t i = 0; i < count; i++)
+        I2C_Write(ADDR_FPGA, regs[i], vals[i]);
+
+    return false;
+}
+
 void SPI_Read(uint8_t page, uint16_t addr, uint32_t *dat0, uint32_t *dat1) {
-    uint8_t val;
     uint32_t rdat;
 
-    // spi_addr
-    val = addr & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x91, val);
-    val = (page << 4) | (addr >> 8);
-    I2C_Write(ADDR_FPGA, 0x92, val);
+    pthread_mutex_lock(&spi_mutex);
 
-    // read cmd
-    I2C_Write(ADDR_FPGA, 0x90, 0x10);
+    // spi_addr, then the read cmd
+    {
+        const uint8_t regs[3] = {0x91, 0x92, 0x90};
+        const uint8_t vals[3] = {addr & 0xFF, (page << 4) | (addr >> 8), 0x10};
+
+        spi_write_regs(regs, vals, 3);
+    }
 
     // read dat
     rdat = I2C_Read(ADDR_FPGA, 0x9b);
@@ -49,36 +78,31 @@ void SPI_Read(uint8_t page, uint16_t addr, uint32_t *dat0, uint32_t *dat1) {
     rdat |= I2C_Read(ADDR_FPGA, 0x9c);
     *dat1 = rdat;
 
+    pthread_mutex_unlock(&spi_mutex);
+
 #ifdef _DEBUG_DM6300
     LOGI("SPI READ: addr=%x  data=  %x  %x", addr, (*dat1), (*dat0));
 #endif
 }
 
 void SPI_Write(uint8_t sel, uint8_t page, uint16_t addr, uint32_t dat) {
-    uint8_t val;
     uint32_t r1 = 0, r0 = 0;
 
-    // spi_addr
-    val = addr & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x91, val);
-    val = (page << 4) | (addr >> 8);
-    I2C_Write(ADDR_FPGA, 0x92, val);
+    // spi_addr, spi_wdat, then the write cmd: seven registers, one sequence
+    const uint8_t regs[7] = {0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x90};
+    const uint8_t vals[7] = {
+        addr & 0xFF,
+        (page << 4) | (addr >> 8),
+        dat & 0xFF,
+        (dat >> 8) & 0xFF,
+        (dat >> 16) & 0xFF,
+        (dat >> 24) & 0xFF,
+        (sel == 0) ? 0x03 : sel,
+    };
 
-    // spi_wdat
-    val = dat & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x93, val);
-    val = (dat >> 8) & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x94, val);
-    val = (dat >> 16) & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x95, val);
-    val = (dat >> 24) & 0xFF;
-    I2C_Write(ADDR_FPGA, 0x96, val);
-
-    // wrte cmd
-    if (sel == 0)
-        I2C_Write(ADDR_FPGA, 0x90, 0x03);
-    else
-        I2C_Write(ADDR_FPGA, 0x90, sel);
+    pthread_mutex_lock(&spi_mutex);
+    spi_write_regs(regs, vals, 7);
+    pthread_mutex_unlock(&spi_mutex);
 
 #ifdef _DEBUG_DM6300
     SPI_Read(page, addr, &r0, &r1);
@@ -1669,7 +1693,12 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     int to_cnt = 0;
     uint32_t r0 = 1, r1 = 1;
 
+    // The bus clock is changed under i2c_mutex so no transfer is in flight
+    // on it; with the init on a worker the OLED and display set-up share the
+    // bus at the time.
+    pthread_mutex_lock(&i2c_mutex);
     system_exec("aww 0x05002814 0x00000008"); // set i2c speed to 1MHz
+    pthread_mutex_unlock(&i2c_mutex);
 
     while (r0) {
         DM5680_ResetRF(0);
@@ -1756,7 +1785,9 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     DM6302_M0();
     LOGI("M0 done");
 
+    pthread_mutex_lock(&i2c_mutex);
     system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
+    pthread_mutex_unlock(&i2c_mutex);
 
     // Recorded, never judged. Checking 0x6/0xFF0 for 0x18 here was wrong:
     // DM6302_M0() writes zero to that register on its first line to load the

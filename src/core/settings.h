@@ -308,6 +308,20 @@ typedef struct {
     // neighbour without. The flag itself is global, so it is scoped to the
     // menu here rather than left off over video and the OSD.
     bool menu_antialias_off;
+    // Bring the HDZero tuner up on a worker started right after the devices,
+    // when start-up is heading straight to HDZero video. DM6302_init() is
+    // 1.8s of I2C to the FPGA and used to wait behind the whole UI build.
+    // While it runs the main I2C bus is at the 1MHz the init asks for, so the
+    // OLED and display set-up of the boot phase run at that speed too.
+    bool async_tuner;
+    // Send the seven FPGA register writes of one tuner SPI write as a single
+    // I2C transaction instead of seven. Falls back to seven if the ioctl is
+    // refused. Speeds up every DM6302_init() and channel change.
+    bool spi_burst;
+    // Do not run wlan_stop.sh at start-up when the WiFi driver is not loaded.
+    // The script sleeps a second and then kills things that are not running,
+    // and it blocks the main loop for 1.08s right after the picture appears.
+    bool skip_wifi_stop;
 } setting_speed_t;
 
 typedef struct {

@@ -17,6 +17,7 @@ enum {
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
     ROW_SKIP_AUDIO,
+    ROW_SPI_BURST,
     ROW_HEAD_MENU,
     ROW_ANTIALIAS_OFF,
     ROW_HEAD_BOOT,
@@ -25,6 +26,8 @@ enum {
     ROW_SKIP_BOOT_MENU,
     ROW_ASYNC_IMU,
     ROW_ASYNC_DISPLAY,
+    ROW_ASYNC_TUNER,
+    ROW_SKIP_WIFI_STOP,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
@@ -54,6 +57,10 @@ enum {
 #define SAVING_BUTTON_BEEP    "50 / 200ms"
 #define SAVING_DIAL_BEEP      "15ms"
 #define SAVING_ANTIALIAS      "faster redraw"
+// Not yet measured on the goggles; the switch log will say.
+#define SAVING_SPI_BURST      "7 > 1 I2C"
+#define SAVING_ASYNC_TUNER    "est. -900ms"
+#define SAVING_SKIP_WIFI_STOP "-1080ms"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
 // first button's arrow at the start of column 2, so column 1 has to be wider
@@ -112,6 +119,9 @@ static void long_press_slider_update(void) {
     lv_label_set_text(slider_long_press.label, buf);
 }
 static btn_group_t btn_group_antialias;
+static btn_group_t btn_group_spi_burst;
+static btn_group_t btn_group_async_tuner;
+static btn_group_t btn_group_skip_wifi_stop;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
 
@@ -159,6 +169,15 @@ static const char *perf_comment_text(int row) {
 
     case ROW_ANTIALIAS_OFF:
         return _lang("Only while the menu is scaled. Restored when it closes.");
+
+    case ROW_SPI_BURST:
+        return _lang("Every tuner init and channel change. Falls back by itself if refused.");
+
+    case ROW_ASYNC_TUNER:
+        return _lang("Applies at the next start-up, only when it goes straight to HDZero video.");
+
+    case ROW_SKIP_WIFI_STOP:
+        return _lang("Applies at the next start-up. Still runs if the WiFi driver is loaded.");
 
     case ROW_BOOT_DISPLAY:
         return _lang("Applies at the next start-up. The boot screen keeps the kernel's mode.");
@@ -250,6 +269,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
+    create_toggle(&btn_group_spi_burst, cont, "Burst Tuner Writes",
+                  g_setting.speed.spi_burst, SAVING_SPI_BURST, ROW_SPI_BURST);
 
     create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
     create_toggle(&btn_group_antialias, cont, "Menu Antialias OFF",
@@ -269,6 +290,12 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_toggle(&btn_group_async_display, cont, "Async Display Setup",
                   g_setting.speed.async_display, SAVING_ASYNC_DISPLAY, ROW_ASYNC_DISPLAY);
+
+    create_toggle(&btn_group_async_tuner, cont, "Async Tuner Init",
+                  g_setting.speed.async_tuner, SAVING_ASYNC_TUNER, ROW_ASYNC_TUNER);
+
+    create_toggle(&btn_group_skip_wifi_stop, cont, "Skip WiFi Stop",
+                  g_setting.speed.skip_wifi_stop, SAVING_SKIP_WIFI_STOP, ROW_SKIP_WIFI_STOP);
 
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
@@ -398,6 +425,18 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_ASYNC_DISPLAY:
         toggle_setting(&btn_group_async_display, &g_setting.speed.async_display, "async_display");
+        break;
+
+    case ROW_ASYNC_TUNER:
+        toggle_setting(&btn_group_async_tuner, &g_setting.speed.async_tuner, "async_tuner");
+        break;
+
+    case ROW_SKIP_WIFI_STOP:
+        toggle_setting(&btn_group_skip_wifi_stop, &g_setting.speed.skip_wifi_stop, "skip_wifi_stop");
+        break;
+
+    case ROW_SPI_BURST:
+        toggle_setting(&btn_group_spi_burst, &g_setting.speed.spi_burst, "spi_burst");
         break;
 
     case ROW_UI_THROTTLE:

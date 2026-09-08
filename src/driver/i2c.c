@@ -160,6 +160,40 @@ static int iic_write_n(int i2c_fd, uint8_t slave_address, uint8_t reg_address, u
     return ret;
 }
 
+// I2C_RDWR_IOCTL_MAX_MSGS is 42 in the kernel; the tuner's SPI bridge needs 7.
+#define IIC_BURST_MAX 16
+
+int8_t i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const uint8_t *vals, uint8_t count) {
+    struct i2c_rdwr_ioctl_data work_queue;
+    struct i2c_msg msgs[IIC_BURST_MAX];
+    uint8_t bufs[IIC_BURST_MAX][2];
+    int ret;
+
+    if (count == 0 || count > IIC_BURST_MAX)
+        return -1;
+
+    if (!iic_is_port_ready(port))
+        return -1;
+
+    for (uint8_t i = 0; i < count; i++) {
+        bufs[i][0] = regs[i];
+        bufs[i][1] = vals[i];
+        msgs[i].addr = slave_address;
+        msgs[i].flags = 0;
+        msgs[i].len = 2;
+        msgs[i].buf = bufs[i];
+    }
+
+    work_queue.nmsgs = count;
+    work_queue.msgs = msgs;
+
+    pthread_mutex_lock(&i2c_mutex);
+    ret = ioctl(g_iic_fds[port], I2C_RDWR, (unsigned long)&work_queue);
+    pthread_mutex_unlock(&i2c_mutex);
+
+    return ret < 0 ? -1 : 0;
+}
+
 uint8_t i2c_read(int port, uint8_t slave_address, uint8_t addr) {
     uint8_t val = 0;
 

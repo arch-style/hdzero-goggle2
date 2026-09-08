@@ -86,6 +86,11 @@ void OLED_ON(int bON);
 void HDZero_open(int bw);
 void HDZero_Close();
 void HDZero_Standby();
+// Run HDZero_open(bw) on a worker. The next HDZero_open/Close/Standby waits
+// for it first, so callers need not know whether it is still running.
+void HDZero_open_async_start(int bw);
+// True while that worker has not been collected yet.
+bool HDZero_open_pending(void);
 
 void Source_HDMI_in();
 void Source_AV(uint8_t sel); // 0=AV in, 1=AV module

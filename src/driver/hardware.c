@@ -587,7 +587,11 @@ void Display_VO_SWITCH(uint8_t sel) // 0 = UI;  1 = HDZERO or AV_in or HDMI_in
 
     if (sel && g_hw_stat.hdzero_open && (g_hw_stat.source_mode == SOURCE_MODE_HDZERO))
         DM6302_openM0(1);
-    else
+    else if (!HDZero_open_pending())
+        // With the async open running the chip is in reset or mid-init, and
+        // DM6302_init() writes this register to zero itself, so the boot-time
+        // close from Display_UI_init() has nothing to add and stays off the
+        // init sequence.
         DM6302_openM0(0);
 
     I2C_Write(ADDR_FPGA, 0x06, 0x0F);
@@ -886,7 +890,54 @@ void Display_1080P30(int mode) {
     pthread_mutex_unlock(&hardware_mutex);
 }
 
+// DM6302_init() is 1.8s of I2C to the FPGA and nothing in the boot UI phase
+// needs the tuner, so start-up can run it on a worker alongside that phase.
+// Every entry point that touches the tuner collects the worker first, and
+// HDZero_open() then finds the tuner already open and does nothing more.
+static pthread_t hdz_async_thread;
+static bool hdz_async_pending = false;
+static int hdz_async_bw;
+
+static void *hdz_async_worker(void *arg) {
+    (void)arg;
+
+    HDZero_open(hdz_async_bw);
+
+    return NULL;
+}
+
+bool HDZero_open_pending(void) {
+    return hdz_async_pending;
+}
+
+static void hdz_async_collect(void) {
+    if (!hdz_async_pending)
+        return;
+
+    // The flag comes down before the join, because the worker itself is
+    // inside HDZero_open() and must not try to collect itself.
+    hdz_async_pending = false;
+    pthread_join(hdz_async_thread, NULL);
+    LOGI("HDZero: async open collected");
+}
+
+void HDZero_open_async_start(int bw) {
+    if (hdz_async_pending)
+        return;
+
+    hdz_async_bw = bw;
+    if (pthread_create(&hdz_async_thread, NULL, hdz_async_worker, NULL) != 0) {
+        LOGE("HDZero: could not start the async open, it will run inline");
+        return;
+    }
+
+    hdz_async_pending = true;
+    LOGI("HDZero: async open started");
+}
+
 void HDZero_open(int bw) {
+    hdz_async_collect();
+
     if (bw != g_hw_stat.hdz_bw) // reopen with different bw
         HDZero_Close();
 
@@ -933,6 +984,8 @@ void HDZero_open(int bw) {
 }
 
 void HDZero_Close() {
+    hdz_async_collect();
+
     DM5680_SetBB(0);
     DM5680_ResetRF(0);
     g_hw_stat.hdzero_open = 0;
@@ -947,6 +1000,8 @@ void HDZero_Close() {
 // tuner stays powered meanwhile, so this is only for short absences such as
 // the menu being open -- never for sleep.
 void HDZero_Standby() {
+    hdz_async_collect();
+
     if (g_hw_stat.hdzero_open == 0) {
         // Nothing configured to hold on to; a close is all this can mean.
         // This also covers an init that failed: holding on to a receiver that

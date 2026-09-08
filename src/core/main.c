@@ -79,12 +79,22 @@ a_exit:
     return NULL;
 }
 
-void start_running(void) {
-    int source;
+static int boot_source(void) {
     if (g_setting.autoscan.source == SETTING_AUTOSCAN_SOURCE_LAST)
-        source = g_setting.autoscan.last_source;
-    else
-        source = g_setting.autoscan.source;
+        return g_setting.autoscan.last_source;
+
+    return g_setting.autoscan.source;
+}
+
+// True when start_running() will go straight to HDZero video, which is the
+// one path that needs the tuner up as early as it can be.
+static bool boot_goes_to_hdzero_video(void) {
+    return boot_source() == SETTING_AUTOSCAN_SOURCE_HDZERO &&
+           g_setting.autoscan.status == SETTING_AUTOSCAN_STATUS_LAST;
+}
+
+void start_running(void) {
+    int source = boot_source();
 
     if (source == SETTING_AUTOSCAN_SOURCE_HDZERO) { // HDZero
         g_source_info.source = SOURCE_HDZERO;
@@ -218,6 +228,15 @@ int main(int argc, char *argv[]) {
     input_device_init();
     hw_stat_init();
     device_init();
+
+    // The tuner init is 1.8s and the UI phase below is about 1.1s, on
+    // different buses apart from the FPGA. After device_init() so that
+    // TP2825_Config() is done before the init raises the bus clock, and only
+    // when start-up is heading straight to HDZero video, since that is the
+    // one path that needs the tuner before the threads run.
+    if (g_setting.speed.async_tuner && boot_goes_to_hdzero_video())
+        HDZero_open_async_start(g_setting.source.hdzero_bw);
+
     esp32_init();
     elrs_init();
     ht_init();

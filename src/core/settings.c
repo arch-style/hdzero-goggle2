@@ -118,6 +118,9 @@ const setting_t g_setting_defaults = {
         .timed_long_press = false,
         .split_lock = false,
         .menu_antialias_off = false,
+        .async_tuner = false,
+        .spi_burst = false,
+        .skip_wifi_stop = false,
     },
     .bugfix = {
         .retry_tuner_init = false,
@@ -554,6 +557,9 @@ void settings_load(void) {
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
     g_setting.speed.menu_antialias_off = settings_get_bool("speed", "menu_antialias_off", g_setting_defaults.speed.menu_antialias_off);
+    g_setting.speed.async_tuner = settings_get_bool("speed", "async_tuner", g_setting_defaults.speed.async_tuner);
+    g_setting.speed.spi_burst = settings_get_bool("speed", "spi_burst", g_setting_defaults.speed.spi_burst);
+    g_setting.speed.skip_wifi_stop = settings_get_bool("speed", "skip_wifi_stop", g_setting_defaults.speed.skip_wifi_stop);
 
     // input feedback
     // bug fixes
@@ -575,6 +581,14 @@ void settings_load(void) {
          g_setting.speed.async_imu ? "on" : "off",
          g_setting.speed.async_display ? "on" : "off",
          g_setting.speed.ui_throttle ? "on" : "off");
+    LOGI("speed: label_diff=%s timed_long_press=%s split_lock=%s menu_antialias_off=%s async_tuner=%s spi_burst=%s skip_wifi_stop=%s",
+         g_setting.speed.label_diff ? "on" : "off",
+         g_setting.speed.timed_long_press ? "on" : "off",
+         g_setting.speed.split_lock ? "on" : "off",
+         g_setting.speed.menu_antialias_off ? "on" : "off",
+         g_setting.speed.async_tuner ? "on" : "off",
+         g_setting.speed.spi_burst ? "on" : "off",
+         g_setting.speed.skip_wifi_stop ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);
