@@ -180,6 +180,10 @@ int main(int argc, char *argv[]) {
     beep_init();
     gpadc_init();
 
+    // Reading the OSD fonts is file I/O and nothing below needs them, so let
+    // it run alongside the display and tuner bring-up rather than after it.
+    osd_font_prefetch_start();
+
     // 4. Initilize UI
     lvgl_init();
     main_menu_init();
@@ -217,17 +221,35 @@ int main(int argc, char *argv[]) {
     // 10. Execute main loop
     g_init_done = 1;
     for (;;) {
+        // The status bar and the source status page rewrite their labels on
+        // every pass, and a rewrite invalidates them whether the text changed
+        // or not, so at one pass per 5ms they were being redrawn around 200
+        // times a second. Nothing on them changes that fast, and the redraws
+        // compete for lvgl_mutex with the dial and button handlers.
+        bool slow_tick = true;
+
+        if (g_setting.speed.ui_throttle) {
+            static uint32_t last_slow_ms = 0;
+            uint32_t now = time_ms();
+
+            slow_tick = (uint32_t)(now - last_slow_ms) >= 50;
+            if (slow_tick)
+                last_slow_ms = now;
+        }
+
         pthread_mutex_lock(&lvgl_mutex);
         main_menu_update();
         sleep_reminder();
-        statubar_update();
+        if (slow_tick)
+            statubar_update();
         osd_hdzero_update();
         draw_hdmi_in_dvr_osd();
         ims_update();
         ui_osd_element_pos_update();
         ht_detect_motion();
         lv_timer_handler();
-        source_status_timer();
+        if (slow_tick)
+            source_status_timer();
         pthread_mutex_unlock(&lvgl_mutex);
         usleep(5000);
         gif_cnt++;

@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 #include "ui/ui_main_menu.h"
-extern page_pack_t pp_fastmenu;
+extern page_pack_t pp_performance;
 #ifdef __cplusplus
 }
 #endif

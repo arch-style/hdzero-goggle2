@@ -887,11 +887,15 @@ void osd_update_element_positions() {
     }
 }
 
+static bool osd_font_prefetch_wait(void);
+
 static void fc_osd_init(uint8_t fhd, uint16_t OFFSET_X, uint16_t OFFSET_Y) {
     uint8_t osd_width = fhd ? OSD_WIDTH_FHD : OSD_WIDTH_HD;
     uint8_t osd_height = fhd ? OSD_HEIGHT_FHD : OSD_HEIGHT_HD;
 
-    load_fc_osd_font(fhd);
+    // Only the first caller waits; by the second the fonts are already in.
+    if (!osd_font_prefetch_wait())
+        load_fc_osd_font(fhd);
 
     for (int i = 0; i < HD_VMAX; i++) {
         for (int j = 0; j < HD_HMAX; j++) {
@@ -1048,6 +1052,51 @@ int load_fc_osd_font_bmp(const char *file, uint8_t fhd) {
     }
     // free(buf); //FIX ME, ntant, it seems system becomes unstable if uncomment this ???
     return 0;
+}
+
+// The two font sets take about a second of SD card reads between them, which
+// at boot happens while the display and the tuner are still being brought up
+// on entirely different buses. Reading them on a worker thread started first
+// hides that time. Pure file I/O into globals, no LVGL calls, so the only
+// thing to get right is that nothing reads the fonts before it finishes.
+static pthread_t font_prefetch_thread;
+static bool font_prefetch_running = false;
+static bool font_prefetch_done = false;
+
+static void *font_prefetch_worker(void *arg) {
+    (void)arg;
+
+    load_fc_osd_font(0);
+    load_fc_osd_font(1);
+
+    return NULL;
+}
+
+void osd_font_prefetch_start(void) {
+    if (!g_setting.speed.boot_fonts)
+        return;
+
+    if (pthread_create(&font_prefetch_thread, NULL, font_prefetch_worker, NULL) != 0) {
+        LOGE("osd: could not start the font prefetch, loading inline instead");
+        return;
+    }
+
+    font_prefetch_running = true;
+    LOGI("osd: font prefetch started");
+}
+
+// Returns true when the prefetch has supplied the fonts and the caller need
+// not load them itself.
+static bool osd_font_prefetch_wait(void) {
+    if (font_prefetch_running) {
+        pthread_join(font_prefetch_thread, NULL);
+        font_prefetch_running = false;
+        font_prefetch_done = true;
+        LOGI("osd: font prefetch collected");
+    }
+
+    // The worker loads both sets, so the second caller is served as well.
+    return font_prefetch_done;
 }
 
 void load_fc_osd_font(uint8_t fhd) {

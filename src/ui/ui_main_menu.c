@@ -18,13 +18,13 @@
 #include "ui/page_common.h"
 #include "ui/page_elrs.h"
 #include "ui/page_fans.h"
-#include "ui/page_fastmenu.h"
 #include "ui/page_favorites.h"
 #include "ui/page_focus_chart.h"
 #include "ui/page_headtracker.h"
 #include "ui/page_imagesettings.h"
 #include "ui/page_input.h"
 #include "ui/page_osd.h"
+#include "ui/page_performance.h"
 #include "ui/page_playback.h"
 #include "ui/page_power.h"
 #include "ui/page_record.h"
@@ -76,7 +76,7 @@ static page_pack_t *page_packs[] = {
 
     // --- second page ---
     &pp_favorites,
-    &pp_fastmenu,
+    &pp_performance,
 };
 
 #define PAGE_COUNT (ARRAY_SIZE(page_packs))

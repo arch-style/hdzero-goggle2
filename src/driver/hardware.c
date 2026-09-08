@@ -630,10 +630,20 @@ static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
 }
 
 void Display_UI_init() {
+    // The boot call configures the display for the menu, and the switch to the
+    // last source immediately reconfigures it for the video, paying dispw's
+    // second measured at over a second twice over. Skipping the first one
+    // leaves the boot UI on whatever mode the kernel set up.
+    static bool first_call = true;
+    bool skip_timing = first_call && g_setting.speed.boot_display;
+
+    first_call = false;
+
     g_hw_stat.source_mode = SOURCE_MODE_UI;
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
-    vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
+    if (!skip_timing)
+        vdpo_set_timing(VDPO_TMG_1080P50, "1080p50");
 
     if (GOGGLE_VER_2)
         system_exec("aww 0x0300b340 0x00000008");

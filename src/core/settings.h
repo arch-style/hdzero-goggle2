@@ -265,6 +265,17 @@ typedef struct {
     // being asked for. It forks amixer once per control, twelve times for an
     // input change, and the switch path asks for the same state every time.
     bool skip_audio;
+    // Skip configuring the display for the menu at boot. The app sets 1080p50
+    // for the UI and then immediately sets the video timing, paying dispw
+    // twice; the boot UI then shows at whatever mode the kernel left.
+    bool boot_display;
+    // Read the OSD font bitmaps on a worker thread started before the display
+    // and tuner are brought up, so the file I/O overlaps with them.
+    bool boot_fonts;
+    // Run the status bar and source status refresh at 20Hz instead of once per
+    // main loop pass. They rewrite their labels every time, and a rewrite
+    // invalidates them whether the text changed or not.
+    bool ui_throttle;
 } setting_speed_t;
 
 typedef enum {
