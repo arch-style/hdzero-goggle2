@@ -563,13 +563,14 @@ void settings_load(void) {
     g_setting.input.long_press_ms = ini_getl("input", "long_press_ms", g_setting_defaults.input.long_press_ms, SETTING_INI);
     if (long_press_choice_index(g_setting.input.long_press_ms) < 0)
         g_setting.input.long_press_ms = g_setting_defaults.input.long_press_ms;
-    LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s skip_boot_menu=%s ui_throttle=%s",
+    LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s boot_display=%s boot_fonts=%s skip_boot_menu=%s defer_menu=%s ui_throttle=%s",
          g_setting.speed.fast_menu ? "on" : "off",
          g_setting.speed.keep_display ? "on" : "off",
          g_setting.speed.skip_audio ? "on" : "off",
          g_setting.speed.boot_display ? "on" : "off",
          g_setting.speed.boot_fonts ? "on" : "off",
          g_setting.speed.skip_boot_menu ? "on" : "off",
+         g_setting.speed.defer_menu ? "on" : "off",
          g_setting.speed.ui_throttle ? "on" : "off");
 
     // storage
@@ -592,6 +593,9 @@ void settings_load(void) {
             g_setting.storage.selftest = true;
         }
     } else if (g_setting.storage.logging) {
+        // The log is wiped at every start, so comparing two boots means
+        // catching the card in between. Keep the one before as .prev.
+        rename(APP_LOG_FILE, APP_LOG_FILE_PREV);
         unlink(APP_LOG_FILE);
         g_setting.storage.logging = log_file_open(APP_LOG_FILE);
     }
