@@ -23,6 +23,7 @@ enum {
     ROW_BOOT_DISPLAY,
     ROW_BOOT_FONTS,
     ROW_SKIP_BOOT_MENU,
+    ROW_DEFER_MENU,
     ROW_HEAD_INPUT,
     ROW_UI_THROTTLE,
     ROW_LABEL_DIFF,
@@ -43,6 +44,7 @@ enum {
 #define SAVING_BOOT_DISPLAY   "-1140ms"
 #define SAVING_BOOT_FONTS     "-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
+#define SAVING_DEFER_MENU     "-577ms"
 #define SAVING_UI_THROTTLE    "200Hz > 20Hz"
 #define SAVING_LABEL_DIFF     "no redraw"
 #define SAVING_LONG_PRESS     "500ms fixed"
@@ -76,7 +78,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -84,6 +86,7 @@ static btn_group_t btn_group_audio;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
+static btn_group_t btn_group_defer_menu;
 static btn_group_t btn_group_ui_throttle;
 static btn_group_t btn_group_label_diff;
 static btn_group_t btn_group_long_press;
@@ -161,6 +164,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_SKIP_BOOT_MENU:
         return _lang("The menu is on screen during start-up until the video covers it.");
+
+    case ROW_DEFER_MENU:
+        return _lang("Built after the video instead. Not used when start-up ends in the menu.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
@@ -250,6 +256,9 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_toggle(&btn_group_skip_boot_menu, cont, "Skip Boot Menu",
                   g_setting.speed.skip_boot_menu, SAVING_SKIP_BOOT_MENU, ROW_SKIP_BOOT_MENU);
+
+    create_toggle(&btn_group_defer_menu, cont, "Defer Menu Build",
+                  g_setting.speed.defer_menu, SAVING_DEFER_MENU, ROW_DEFER_MENU);
 
     create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
     create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
@@ -371,6 +380,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_SKIP_BOOT_MENU:
         toggle_setting(&btn_group_skip_boot_menu, &g_setting.speed.skip_boot_menu, "skip_boot_menu");
+        break;
+
+    case ROW_DEFER_MENU:
+        toggle_setting(&btn_group_defer_menu, &g_setting.speed.defer_menu, "defer_menu");
         break;
 
     case ROW_UI_THROTTLE:

@@ -79,6 +79,19 @@ a_exit:
     return NULL;
 }
 
+// Where start-up is headed. The menu is the destination only when HDZero is
+// the source and auto scan is off; everything else goes straight to video.
+static bool boot_ends_in_menu(void) {
+    int source = (g_setting.autoscan.source == SETTING_AUTOSCAN_SOURCE_LAST)
+                     ? g_setting.autoscan.last_source
+                     : g_setting.autoscan.source;
+
+    if (source != SETTING_AUTOSCAN_SOURCE_HDZERO)
+        return false;
+
+    return g_setting.autoscan.status == SETTING_AUTOSCAN_STATUS_OFF;
+}
+
 void start_running(void) {
     int source;
     if (g_setting.autoscan.source == SETTING_AUTOSCAN_SOURCE_LAST)
@@ -201,14 +214,20 @@ int main(int argc, char *argv[]) {
     osd_font_prefetch_start();
 
     // 4. Initilize UI
+    // Building the menu is the largest thing between here and a picture, and
+    // only matters once someone opens it, so when start-up is heading for
+    // video it happens afterwards instead.
+    bool defer_menu = g_setting.speed.defer_menu && !boot_ends_in_menu();
+
     uint32_t phase_ms = time_ms();
     uint32_t step_ms = phase_ms;
     lvgl_init();
     LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
 
     step_ms = time_ms();
-    main_menu_init();
-    LOGI("boot phase: menu pages %ums", time_ms() - step_ms);
+    if (!defer_menu)
+        main_menu_init();
+    LOGI("boot phase: menu pages %ums%s", time_ms() - step_ms, defer_menu ? " (deferred)" : "");
 
     step_ms = time_ms();
     statusbar_init();
@@ -240,6 +259,16 @@ int main(int argc, char *argv[]) {
 
     // 8. Start threads
     start_running();
+
+    if (defer_menu) {
+        step_ms = time_ms();
+        main_menu_init();
+        // Created after the OSD screen now, so it would be drawn over the
+        // video. Put it back underneath.
+        main_menu_move_behind_osd();
+        LOGI("boot phase: menu pages after video %ums", time_ms() - step_ms);
+    }
+
     create_threads();
 
     // 9. Synthetic counter for gif refresh

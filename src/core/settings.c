@@ -111,6 +111,7 @@ const setting_t g_setting_defaults = {
         .boot_display = false,
         .boot_fonts = false,
         .skip_boot_menu = false,
+        .defer_menu = false,
         .ui_throttle = false,
         .label_diff = false,
         .timed_long_press = false,
@@ -545,6 +546,7 @@ void settings_load(void) {
     g_setting.speed.boot_display = settings_get_bool("speed", "boot_display", g_setting_defaults.speed.boot_display);
     g_setting.speed.boot_fonts = settings_get_bool("speed", "boot_fonts", g_setting_defaults.speed.boot_fonts);
     g_setting.speed.skip_boot_menu = settings_get_bool("speed", "skip_boot_menu", g_setting_defaults.speed.skip_boot_menu);
+    g_setting.speed.defer_menu = settings_get_bool("speed", "defer_menu", g_setting_defaults.speed.defer_menu);
     g_setting.speed.ui_throttle = settings_get_bool("speed", "ui_throttle", g_setting_defaults.speed.ui_throttle);
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
