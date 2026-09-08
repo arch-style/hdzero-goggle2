@@ -103,7 +103,7 @@ const setting_t g_setting_defaults = {
         .label_diff = false,
         .timed_long_press = false,
         .split_lock = false,
-        .antialias_off = false,
+        .menu_antialias_off = false,
     },
     .input = {
         .button_beep = false,
@@ -532,7 +532,7 @@ void settings_load(void) {
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
-    g_setting.speed.antialias_off = settings_get_bool("speed", "antialias_off", g_setting_defaults.speed.antialias_off);
+    g_setting.speed.menu_antialias_off = settings_get_bool("speed", "menu_antialias_off", g_setting_defaults.speed.menu_antialias_off);
 
     // input feedback
     g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);

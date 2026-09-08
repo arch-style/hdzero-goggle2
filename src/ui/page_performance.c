@@ -121,7 +121,7 @@ static const char *perf_comment_text(int row) {
     }
 
     if (row <= ROW_ANTIALIAS_OFF)
-        return _lang("Applies to all drawing, not only the menu.");
+        return _lang("Restored when the menu closes. Rougher edges.");
 
     if (row <= ROW_BOOT_FONTS)
         return _lang("Applies at the next start-up.");
@@ -181,8 +181,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
 
     create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
-    create_toggle(&btn_group_antialias, cont, "Antialiasing OFF",
-                  g_setting.speed.antialias_off, SAVING_ANTIALIAS, ROW_ANTIALIAS_OFF);
+    create_toggle(&btn_group_antialias, cont, "Menu Antialias OFF",
+                  g_setting.speed.menu_antialias_off, SAVING_ANTIALIAS, ROW_ANTIALIAS_OFF);
 
     create_heading(cont, arr, _lang("Boot"), ROW_HEAD_BOOT);
     create_toggle(&btn_group_boot_display, cont, "Skip Display Setup",
@@ -298,7 +298,7 @@ static void on_click(uint8_t key, int sel) {
         break;
 
     case ROW_ANTIALIAS_OFF:
-        toggle_setting(&btn_group_antialias, &g_setting.speed.antialias_off, "antialias_off");
+        toggle_setting(&btn_group_antialias, &g_setting.speed.menu_antialias_off, "menu_antialias_off");
         main_menu_apply_antialiasing();
         break;
 

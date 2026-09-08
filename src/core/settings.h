@@ -289,10 +289,12 @@ typedef struct {
     // of once around all of them, so the input handlers get several chances
     // to run per pass instead of waiting for the whole batch.
     bool split_lock;
-    // Turn LVGL's antialiasing off. It is what makes the scaled menu heavy,
-    // because a transformed object is resampled bilinearly with it and by
-    // nearest neighbour without. Global, so edges are rougher everywhere.
-    bool antialias_off;
+    // Turn LVGL's antialiasing off while the scaled menu is up, and put it
+    // back on the way out. Antialiasing is what makes the scaled menu heavy:
+    // a transformed object is resampled bilinearly with it and by nearest
+    // neighbour without. The flag itself is global, so it is scoped to the
+    // menu here rather than left off over video and the OSD.
+    bool menu_antialias_off;
 } setting_speed_t;
 
 typedef struct {

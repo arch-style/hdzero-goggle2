@@ -357,10 +357,17 @@ static void menu_reinit(void) {
 #define MENU_POS_X 250
 
 static lv_coord_t menu_design_ver_res = 0;
+static bool menu_scaled = false;
 
-// Global, and nothing else touches the flag, so this is the whole rule.
+bool main_menu_is_shown(void);
+
+// The flag is global, so drop it only while the scaled menu is the thing on
+// screen and restore it the moment it is not. Video and the OSD then never
+// render under a setting the menu asked for.
 void main_menu_apply_antialiasing(void) {
-    lvgl_set_antialiasing(!g_setting.speed.antialias_off);
+    bool off = g_setting.speed.menu_antialias_off && menu_scaled && main_menu_is_shown();
+
+    lvgl_set_antialiasing(!off);
 }
 
 static void main_menu_fit_display(void) {
@@ -382,6 +389,7 @@ static void main_menu_fit_display(void) {
                    (MENU_POS_Y * zoom) / LV_IMG_ZOOM_NONE);
 
     statusbar_set_zoom(zoom);
+    menu_scaled = (zoom != LV_IMG_ZOOM_NONE);
 
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
@@ -396,8 +404,10 @@ void main_menu_show(bool is_show) {
         main_menu_fit_display();
         menu_reinit();
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
+        main_menu_apply_antialiasing();
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
+        main_menu_apply_antialiasing(); // hidden now, so put the flag back
     }
 }
 
@@ -474,9 +484,6 @@ void main_menu_init(void) {
     qsort(post_bootup_actions, post_bootup_actions_count, sizeof(page_pack_t *), post_bootup_actions_cmp);
 
     menu_page_apply();
-
-    // Global and not tied to the menu being open, so settle it once here.
-    main_menu_apply_antialiasing();
 
     lv_obj_add_style(section, &style_rootmenu, LV_PART_MAIN);
     lv_obj_set_size(section, 250, MENU_SIDEBAR_HEIGHT);
