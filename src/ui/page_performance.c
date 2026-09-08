@@ -13,6 +13,7 @@ enum {
     ROW_HEAD_MENU = 0,
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
+    ROW_FAST_SCALING,
     ROW_SKIP_AUDIO,
     ROW_HEAD_BOOT,
     ROW_BOOT_DISPLAY,
@@ -41,11 +42,14 @@ enum {
 #define SAVING_SPLIT_LOCK   "10 unlocks/pass"
 #define SAVING_CLICK_BEEP   "50ms beep"
 #define SAVING_LONG_BEEP    "200ms beep"
+#define SAVING_FAST_SCALING "no filtering"
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
 // 51 rather than 60: thirteen rows plus a note is more than the stock page
 // height allows at the usual spacing.
-static lv_coord_t row_dsc[] = {51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, 51, LV_GRID_TEMPLATE_LAST};
+// 47 rather than 60: sixteen rows plus a note is well past what the stock
+// page height allows at the usual spacing.
+static lv_coord_t row_dsc[] = {47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, 47, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
@@ -58,6 +62,7 @@ static btn_group_t btn_group_long_press;
 static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_click_beep;
 static btn_group_t btn_group_long_beep;
+static btn_group_t btn_group_fast_scaling;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
@@ -119,6 +124,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     create_toggle(&btn_group_overlay, cont, "Menu Over Video",
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
+    create_toggle(&btn_group_fast_scaling, cont, "Fast Menu Scaling",
+                  g_setting.speed.fast_scaling, SAVING_FAST_SCALING, ROW_FAST_SCALING);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
 
@@ -183,6 +190,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_KEEP_DISPLAY:
         toggle_setting(&btn_group_overlay, &g_setting.speed.keep_display, "keep_display");
+        break;
+
+    case ROW_FAST_SCALING:
+        toggle_setting(&btn_group_fast_scaling, &g_setting.speed.fast_scaling, "fast_scaling");
         break;
 
     case ROW_SKIP_AUDIO:

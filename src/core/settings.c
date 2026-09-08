@@ -103,6 +103,7 @@ const setting_t g_setting_defaults = {
         .label_diff = false,
         .timed_long_press = false,
         .split_lock = false,
+        .fast_scaling = false,
     },
     .input = {
         .click_beep = false,
@@ -531,6 +532,7 @@ void settings_load(void) {
     g_setting.speed.label_diff = settings_get_bool("speed", "label_diff", g_setting_defaults.speed.label_diff);
     g_setting.speed.timed_long_press = settings_get_bool("speed", "timed_long_press", g_setting_defaults.speed.timed_long_press);
     g_setting.speed.split_lock = settings_get_bool("speed", "split_lock", g_setting_defaults.speed.split_lock);
+    g_setting.speed.fast_scaling = settings_get_bool("speed", "fast_scaling", g_setting_defaults.speed.fast_scaling);
 
     // input feedback
     g_setting.input.click_beep = settings_get_bool("input", "click_beep", g_setting_defaults.input.click_beep);

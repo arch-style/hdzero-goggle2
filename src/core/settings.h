@@ -289,6 +289,10 @@ typedef struct {
     // of once around all of them, so the input handlers get several chances
     // to run per pass instead of waiting for the whole batch.
     bool split_lock;
+    // Resample the scaled menu with nearest neighbour instead of bilinear.
+    // The scaling is what makes menu navigation heavy, and the filtering is
+    // the expensive part of it.
+    bool fast_scaling;
 } setting_speed_t;
 
 typedef struct {

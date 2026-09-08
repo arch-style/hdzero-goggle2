@@ -8,6 +8,7 @@
 
 #include "common.hh"
 #include "core/app_state.h"
+#include "core/settings.h"
 #include "driver/hardware.h"
 #include "driver/mcp3021.h"
 #include "driver/oled.h"
@@ -376,6 +377,10 @@ static void main_menu_fit_display(void) {
                    (MENU_POS_Y * zoom) / LV_IMG_ZOOM_NONE);
 
     statusbar_set_zoom(zoom);
+
+    // Only matters while something is actually scaled, but setting it here
+    // keeps it next to the decision it belongs to.
+    lvgl_set_antialiasing(!(zoom != LV_IMG_ZOOM_NONE && g_setting.speed.fast_scaling));
 
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
