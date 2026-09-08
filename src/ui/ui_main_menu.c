@@ -349,15 +349,25 @@ static lv_coord_t menu_design_ver_res = 0;
 
 static void main_menu_fit_display(void) {
     lv_coord_t ver_res = lv_disp_get_ver_res(NULL);
+    lv_coord_t hor_res = lv_disp_get_hor_res(NULL);
     lv_coord_t zoom = LV_IMG_ZOOM_NONE;
 
+    // The status bar is a sibling, fixed at the top and never scaled, so the
+    // menu keeps its original offset below it and fits into what is left
+    // rather than scaling the offset too.
     if (menu_design_ver_res > 0 && ver_res < menu_design_ver_res)
-        zoom = (ver_res * LV_IMG_ZOOM_NONE) / menu_design_ver_res;
+        zoom = ((ver_res - MENU_POS_Y) * LV_IMG_ZOOM_NONE) / (menu_design_ver_res - MENU_POS_Y);
 
     lv_obj_set_style_transform_zoom(menu, zoom, 0);
-    lv_obj_set_pos(menu,
-                   (MENU_POS_X * zoom) / LV_IMG_ZOOM_NONE,
-                   (MENU_POS_Y * zoom) / LV_IMG_ZOOM_NONE);
+
+    if (zoom == LV_IMG_ZOOM_NONE) {
+        lv_obj_set_pos(menu, MENU_POS_X, MENU_POS_Y);
+    } else {
+        // Scaling is about the top-left corner, so centre what is left of the
+        // width by hand instead of leaving it hard against the old offset.
+        lv_coord_t scaled_w = (lv_obj_get_width(menu) * zoom) / LV_IMG_ZOOM_NONE;
+        lv_obj_set_pos(menu, (hor_res - DISP_OVERSCAN - scaled_w) / 2, MENU_POS_Y);
+    }
 
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
