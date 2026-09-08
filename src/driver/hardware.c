@@ -648,8 +648,14 @@ void Display_UI_init() {
 
     Display_VO_SWITCH(0);
 
-    vclk_phase_set(VIDEO_SOURCE_MENU_UI, 0);
-    pclk_phase_set(VIDEO_SOURCE_MENU_UI);
+    // The clock phases go with the timing, not with the source: MENU_UI's
+    // values are the ones for 1080p50. Applying them while the panel is still
+    // running the video timing is what tore the picture into stripes, so when
+    // the timing stays put these are left exactly as the video set them.
+    if (reconfigure) {
+        vclk_phase_set(VIDEO_SOURCE_MENU_UI, 0);
+        pclk_phase_set(VIDEO_SOURCE_MENU_UI);
+    }
     I2C_Write(ADDR_FPGA, 0x80, 0x00);
     I2C_Write(ADDR_FPGA, 0x84, 0x11);
 
@@ -660,7 +666,9 @@ void Display_UI_init() {
 
     system_exec("aww 0x0300b084 0x00002aaa"); // Set vdpo clock driver strength to level 2. Refer datasheet 12.7.5.11
 
-    if (GOGGLE_VER_2)
+    // 0xa7 tracks the timing too: the video paths set 0x11 for 720p and this
+    // sets 0x00 alongside the 1080p50 switch, so it moves only when they do.
+    if (GOGGLE_VER_2 && reconfigure)
         I2C_Write(ADDR_FPGA, 0xa7, 0x00);
 
     system_exec("aww 0x06542018 0x00000044"); // disable horizontal chroma FIR filter.
