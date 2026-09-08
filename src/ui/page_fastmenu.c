@@ -12,15 +12,32 @@
 enum {
     ROW_FAST_MENU = 0,
     ROW_KEEP_DISPLAY,
+    ROW_SKIP_AUDIO,
     ROW_BACK,
     ROW_COUNT
 };
+
+// Measured on the goggles with the switch path instrumented. The saving is
+// shown next to each toggle so the cost of leaving one off is visible.
+#define SAVING_FAST_MENU    "-2300ms"
+#define SAVING_KEEP_DISPLAY "-1100ms x2"
+#define SAVING_SKIP_AUDIO   "-460ms"
 
 static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
+static btn_group_t btn_group_audio;
+
+// The saving sits in the columns to the right of the Off/On buttons, which
+// create_btn_group_item() leaves free; putting it in the row's own label
+// would run the text under the buttons.
+static void create_saving_label(lv_obj_t *cont, const char *saving, int row) {
+    create_label_item_compact(cont, saving, 4, row, 2, 60,
+                              LV_TEXT_ALIGN_LEFT, LV_GRID_ALIGN_START,
+                              &lv_font_montserrat_20);
+}
 
 static lv_obj_t *page_fastmenu_create(lv_obj_t *parent, panel_arr_t *arr) {
     char buf[512];
@@ -51,11 +68,20 @@ static lv_obj_t *page_fastmenu_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_btn_group_item(&btn_group_tuner, cont, 2, _lang("Keep Tuner Alive"), _lang("Off"), _lang("On"), "", "", row++);
+    create_btn_group_item(&btn_group_tuner, cont, 2, _lang("Keep Tuner Alive"), _lang("Off"), _lang("On"), "", "", ROW_FAST_MENU);
     btn_group_set_sel(&btn_group_tuner, g_setting.speed.fast_menu ? 1 : 0);
+    create_saving_label(cont, SAVING_FAST_MENU, ROW_FAST_MENU);
+    row++;
 
-    create_btn_group_item(&btn_group_overlay, cont, 2, _lang("Menu Over Video"), _lang("Off"), _lang("On"), "", "", row++);
+    create_btn_group_item(&btn_group_overlay, cont, 2, _lang("Menu Over Video"), _lang("Off"), _lang("On"), "", "", ROW_KEEP_DISPLAY);
     btn_group_set_sel(&btn_group_overlay, g_setting.speed.keep_display ? 1 : 0);
+    create_saving_label(cont, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
+    row++;
+
+    create_btn_group_item(&btn_group_audio, cont, 2, _lang("Skip Audio Setup"), _lang("Off"), _lang("On"), "", "", ROW_SKIP_AUDIO);
+    btn_group_set_sel(&btn_group_audio, g_setting.speed.skip_audio ? 1 : 0);
+    create_saving_label(cont, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
+    row++;
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, row++, 3);
@@ -63,13 +89,21 @@ static lv_obj_t *page_fastmenu_create(lv_obj_t *parent, panel_arr_t *arr) {
     pp_fastmenu.p_arr.max = row;
 
     lv_obj_t *note = lv_label_create(cont);
-    snprintf(buf, sizeof(buf), "%s:\n    - %s\n    - %s\n%s:\n    - %s\n    - %s",
+    snprintf(buf, sizeof(buf),
+             "%s\n"
+             "%s: %s. %s\n"
+             "%s: %s. %s\n"
+             "%s: %s. %s",
+             _lang("All off is the original behaviour. Times are per switch."),
              _lang("Keep Tuner Alive"),
              _lang("Returning to video no longer re-initialises the receiver"),
              _lang("The receiver stays powered while the menu is open"),
              _lang("Menu Over Video"),
-             _lang("The display is not reconfigured for the menu"),
-             _lang("The menu is cropped unless the video is 1080p"));
+             _lang("The display is not reconfigured, saving the cost both ways"),
+             _lang("The menu is cropped unless the video is 1080p"),
+             _lang("Skip Audio Setup"),
+             _lang("The mixer is left alone when it already holds the state"),
+             _lang("No effect on sound"));
     lv_label_set_text(note, buf);
 
     lv_obj_set_style_text_font(note, &lv_font_montserrat_16, 0);
@@ -96,6 +130,13 @@ static void on_click(uint8_t key, int sel) {
         g_setting.speed.keep_display = btn_group_get_sel(&btn_group_overlay) == 1;
         settings_put_bool("speed", "keep_display", g_setting.speed.keep_display);
         LOGI("speed: keep_display=%s", g_setting.speed.keep_display ? "on" : "off");
+        break;
+
+    case ROW_SKIP_AUDIO:
+        btn_group_toggle_sel(&btn_group_audio);
+        g_setting.speed.skip_audio = btn_group_get_sel(&btn_group_audio) == 1;
+        settings_put_bool("speed", "skip_audio", g_setting.speed.skip_audio);
+        LOGI("speed: skip_audio=%s", g_setting.speed.skip_audio ? "on" : "off");
         break;
 
     default:

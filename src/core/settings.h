@@ -261,6 +261,10 @@ typedef struct {
     // directions. The menu is laid out for 1080p, so it is cropped whenever
     // the video is not.
     bool keep_display;
+    // Skip re-running audio_sel.sh when the mixer already holds the state
+    // being asked for. It forks amixer once per control, twelve times for an
+    // input change, and the switch path asks for the same state every time.
+    bool skip_audio;
 } setting_speed_t;
 
 typedef enum {

@@ -51,7 +51,7 @@ void dvr_enable_line_out(bool enable) {
     static int last_enable = -1;
     char buf[128];
 
-    if (last_enable == (int)enable)
+    if (g_setting.speed.skip_audio && last_enable == (int)enable)
         return;
     last_enable = enable;
 
@@ -82,7 +82,7 @@ void dvr_select_audio_source(uint8_t source) {
     // twelve amixer processes in all, measured at ~365ms. The source does not
     // change from one switch to the next.
     static int last_source = -1;
-    if (last_source == (int)source)
+    if (g_setting.speed.skip_audio && last_source == (int)source)
         return;
     last_source = source;
 

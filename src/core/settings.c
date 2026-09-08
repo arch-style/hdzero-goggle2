@@ -96,6 +96,7 @@ const setting_t g_setting_defaults = {
     .speed = {
         .fast_menu = false,
         .keep_display = false,
+        .skip_audio = false,
     },
     .osd = {
         .orbit = 2,
@@ -513,9 +514,11 @@ void settings_load(void) {
     // speed
     g_setting.speed.fast_menu = settings_get_bool("speed", "fast_menu", g_setting_defaults.speed.fast_menu);
     g_setting.speed.keep_display = settings_get_bool("speed", "keep_display", g_setting_defaults.speed.keep_display);
-    LOGI("speed: fast_menu=%s keep_display=%s",
+    g_setting.speed.skip_audio = settings_get_bool("speed", "skip_audio", g_setting_defaults.speed.skip_audio);
+    LOGI("speed: fast_menu=%s keep_display=%s skip_audio=%s",
          g_setting.speed.fast_menu ? "on" : "off",
-         g_setting.speed.keep_display ? "on" : "off");
+         g_setting.speed.keep_display ? "on" : "off",
+         g_setting.speed.skip_audio ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);
