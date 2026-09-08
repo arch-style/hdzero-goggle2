@@ -37,14 +37,19 @@ enum {
 #define SAVING_BOOT_DISPLAY "-1140ms"
 #define SAVING_BOOT_FONTS   "-1000ms"
 #define SAVING_UI_THROTTLE  "200Hz > 20Hz"
-#define SAVING_LABEL_DIFF   "no idle redraw"
-#define SAVING_LONG_PRESS   "500ms, steady"
-#define SAVING_SPLIT_LOCK   "10 unlocks/pass"
+#define SAVING_LABEL_DIFF   "no redraw"
+#define SAVING_LONG_PRESS   "500ms fixed"
+#define SAVING_SPLIT_LOCK   "10 unlocks"
 #define SAVING_CLICK_BEEP   "50ms beep"
 #define SAVING_LONG_BEEP    "200ms beep"
 #define SAVING_FAST_SCALING "no filtering"
 
-static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LAST};
+// create_btn_group_item() gives its label a 320px box at column 1 and puts the
+// first button's arrow at the start of column 2, so with the stock columns the
+// arrow lands 120px inside the label and collides with any name long enough to
+// reach it. Widen column 1 so the label box ends before column 2 begins.
+// 120 + 340 + 180 + 180 + 140 fills the 960px container exactly.
+static lv_coord_t col_dsc[] = {120, 340, 180, 180, 140, 0, LV_GRID_TEMPLATE_LAST};
 // 51 rather than 60: thirteen rows plus a note is more than the stock page
 // height allows at the usual spacing.
 // This page has more rows than fit however they are sized, so rather than
@@ -53,9 +58,10 @@ static lv_coord_t col_dsc[] = {160, 200, 200, 160, 160, 160, LV_GRID_TEMPLATE_LA
 // scrolls and the dial brings the selection into view.
 #define PERF_ROW_H 51
 
-// Height that is known to render: the favourites page puts its last row at
-// 672 and that is on screen, so ending at 660 is inside proven ground.
-#define PERF_VISIBLE_H 600
+// The first fitting attempt left a third of the page unused, so take the
+// space: the photographs show the menu background running well past where
+// the rows stopped. Anything past this still scrolls.
+#define PERF_VISIBLE_H 780
 
 static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
