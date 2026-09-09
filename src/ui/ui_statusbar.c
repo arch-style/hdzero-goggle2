@@ -46,15 +46,21 @@ LV_IMG_DECLARE(img_lowBattery);
 // not the content changed, and this bar rewrites every field on every pass of
 // the main loop, so an idle bar was being redrawn for nothing. Comparing first
 // costs a strcmp and saves a redraw.
-static void sb_label(lv_obj_t *label, const char *text) {
-    if (g_setting.speed.label_diff) {
-        const char *cur = lv_label_get_text(label);
+//
+// The comparison is against our own copy of what was last written, not against
+// lv_label_get_text(): LV_LABEL_LONG_DOT rewrites the label's own buffer,
+// replacing the tail with an ellipsis, so for any field wider than the 267px
+// these are given -- which is every field here but the battery -- the stored
+// text never again matches what was set and the check passed everything
+// through. Every label but the SD card one is LONG_DOT.
+static char sb_last[STS_TOTAL][128];
 
-        if (cur && strcmp(cur, text) == 0)
-            return;
-    }
+static void sb_label(enum STATUS idx, const char *text) {
+    if (g_setting.speed.label_diff && strcmp(sb_last[idx], text) == 0)
+        return;
 
-    lv_label_set_text(label, text);
+    snprintf(sb_last[idx], sizeof(sb_last[idx]), "%s", text);
+    lv_label_set_text(label[idx], text);
 }
 
 static void sb_img(lv_obj_t *img, const lv_img_dsc_t *src) {
@@ -167,7 +173,7 @@ int statusbar_init(void) {
 
     snprintf(buf, sizeof(buf), "%s                 ", _lang("SD Card"));
 
-    sb_label(label[STS_SDCARD], buf);
+    sb_label(STS_SDCARD, buf);
     lv_label_set_recolor(label[STS_SDCARD], true);
 
     if (g_source_info.source == SOURCE_HDZERO)
@@ -185,15 +191,15 @@ int statusbar_init(void) {
     } else
         snprintf(buf, sizeof(buf), " ");
 
-    sb_label(label[STS_SOURCE], buf);
+    sb_label(STS_SOURCE, buf);
 
     snprintf(buf, sizeof(buf), "ELRS: %s", _lang("Off"));
-    sb_label(label[STS_ELRS], buf);
+    sb_label(STS_ELRS, buf);
 
     snprintf(buf, sizeof(buf), "WiFi: %s", _lang("Off"));
-    sb_label(label[STS_WIFI], buf);
+    sb_label(STS_WIFI, buf);
 
-    sb_label(label[STS_BATT], "       ");
+    sb_label(STS_BATT, "       ");
     return 0;
 }
 
@@ -203,7 +209,7 @@ void statubar_update(void) {
 
     // display battery voltage
     battery_get_voltage_str(buf);
-    sb_label(label[STS_BATT], buf);
+    sb_label(STS_BATT, buf);
 
     {
 #define BEEP_INTERVAL 20
@@ -271,7 +277,7 @@ void statubar_update(void) {
         } else
             snprintf(buf, sizeof(buf), " ");
 
-        sb_label(label[STS_SOURCE], buf);
+        sb_label(STS_SOURCE, buf);
     }
 
     hdzero_channel_last = g_setting.scan.channel;
@@ -282,7 +288,7 @@ void statubar_update(void) {
 
     if (page_storage_is_sd_repair_active()) {
         sb_img(img_sdc, &img_sdcard);
-        sb_label(label[STS_SDCARD], _lang("Integrity check"));
+        sb_label(STS_SDCARD, _lang("Integrity check"));
     } else {
         if (g_sdcard_enable) {
             int cnt = get_videofile_cnt();
@@ -309,17 +315,17 @@ void statubar_update(void) {
             }
         }
 
-        sb_label(label[STS_SDCARD], buf);
+        sb_label(STS_SDCARD, buf);
     }
 
     if (g_setting.elrs.enable) {
         snprintf(buf, sizeof(buf), "ELRS: %s ", _lang("On"));
-        sb_label(label[STS_ELRS], buf);
+        sb_label(STS_ELRS, buf);
     } else {
         snprintf(buf, sizeof(buf), "ELRS: %s ", _lang("Off"));
-        sb_label(label[STS_ELRS], buf);
+        sb_label(STS_ELRS, buf);
     }
 
     page_wifi_get_statusbar_text(buf, sizeof(buf));
-    sb_label(label[STS_WIFI], buf);
+    sb_label(STS_WIFI, buf);
 }
