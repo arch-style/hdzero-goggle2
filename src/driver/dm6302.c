@@ -1286,6 +1286,27 @@ typedef union _EFUSE {
 
 EFUSE_T efuse0, efuse1;
 
+// The efuse is programmed once at the factory, so a healthy read is the same
+// every boot. Logging a hash of the whole structure makes the fast two-chip
+// read checkable against the one-chip-at-a-time read it replaces: same
+// number, same calibration.
+static uint32_t efuse_fingerprint(const EFUSE_T *e) {
+    const unsigned char *p = (const unsigned char *)e;
+    uint32_t h = 2166136261u;
+
+    for (unsigned k = 0; k < sizeof(EFUSE_T); k++) {
+        h ^= p[k];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void efuse_report(uint8_t SEL6302, const EFUSE_T *e) {
+    LOGI("EFUSE1 %d: band_num=%d bandgap=%08lx ical=%x rcal=%x fingerprint=%08x",
+         SEL6302, e->macro.m0.band_num, e->macro.m1.bandgap,
+         e->macro.m1.ical, e->macro.m1.rcal, efuse_fingerprint(e));
+}
+
 void DM6302_EFUSE1(uint8_t SEL6302) {
     int i, j;
     uint32_t r0, r1, rdat_sel;
@@ -1429,6 +1450,131 @@ void DM6302_EFUSE1(uint8_t SEL6302) {
 
     SPI_Write(SEL6302, 0x6, 0xF14, efuse_sel->macro.m1.bandgap);
     SPI_Write(SEL6302, 0x6, 0xF18, r1);
+
+    efuse_report(SEL6302, efuse_sel);
+}
+
+// One efuse word from both chips at once. SPI_Read already returns both, and
+// SPI_Write with sel 0 addresses both, so the only thing the per-chip version
+// gained was reading one ready bit instead of two -- at the price of doing
+// the whole walk twice. Waits for both chips before taking the data.
+static void efuse_read_both(int macro, int j, uint32_t *d0, uint32_t *d1) {
+    uint32_t r0, r1;
+
+    // EFUSE_CFG = (macro<<11) | (j<<4) | 0x1, to both chips
+    SPI_Write(0, 0x3, 0x7D0, (macro << 11) | (j << 4) | 0x1);
+
+    do {
+        SPI_Read(0x3, 0x7D4, &r0, &r1);
+    } while ((r0 & 1) || (r1 & 1));
+
+    SPI_Read(0x3, 0x7D8, d0, d1);
+}
+
+// The two-chip walk. Mirrors DM6302_EFUSE1() exactly, including where each
+// chip stops early: band_num can differ between the two, and so can the
+// frequency sanity check that ends a band's read, so both are tracked per
+// chip and only the chip still reading has its bytes stored.
+void DM6302_EFUSE1_both(void) {
+    int i, j;
+    uint32_t r0, r1;
+    int band_max;
+
+    memset((char *)&efuse0, 0, sizeof(EFUSE_T));
+    memset((char *)&efuse1, 0, sizeof(EFUSE_T));
+
+    // EFUSE_RST = 1
+    SPI_Write(0, 0x6, 0xFF0, 0x00000019);
+    SPI_Write(0, 0x3, 0x0E0, 0x00000001);
+
+    LOGI("EFUSE1 both, s1");
+
+    SPI_Write(0, 0x6, 0xFF0, 0x00000018);
+
+    for (j = 66; j < 68; j++) { // read macro 0
+        efuse_read_both(0, j, &r0, &r1);
+        efuse0.dat[0][j] = r0 & 0xFF;
+        efuse1.dat[0][j] = r1 & 0xFF;
+    }
+
+    LOGI("EFUSE1 both, s2");
+
+    for (j = 0; j < 12; j++) { // read macro 1
+        efuse_read_both(1, j, &r0, &r1);
+        efuse0.dat[1][j] = r0 & 0xFF;
+        efuse1.dat[1][j] = r1 & 0xFF;
+    }
+
+    band_max = efuse0.macro.m0.band_num;
+    if (efuse1.macro.m0.band_num > band_max)
+        band_max = efuse1.macro.m0.band_num;
+
+    LOGI("EFUSE1 both, s3, %d/%d", efuse0.macro.m0.band_num, efuse1.macro.m0.band_num);
+
+    for (i = 2; i < band_max + 2; i++) { // read macro 2~11
+        bool in0 = (i < efuse0.macro.m0.band_num + 2);
+        bool in1 = (i < efuse1.macro.m0.band_num + 2);
+        bool go0, go1;
+
+        go0 = in0;
+        go1 = in1;
+        for (j = 0; j < 20 && (go0 || go1); j++) {
+            efuse_read_both(i, j, &r0, &r1);
+            if (go0)
+                efuse0.dat[i][j] = r0 & 0xFF;
+            if (go1)
+                efuse1.dat[i][j] = r1 & 0xFF;
+
+            if (j == 3) {
+                if (go0 && (efuse0.macro.m2[i - 2].rx1.freq_start < 5000 ||
+                            efuse0.macro.m2[i - 2].rx1.freq_stop > 6000))
+                    go0 = false;
+                if (go1 && (efuse1.macro.m2[i - 2].rx1.freq_start < 5000 ||
+                            efuse1.macro.m2[i - 2].rx1.freq_stop > 6000))
+                    go1 = false;
+            }
+        }
+
+        LOGI("EFUSE1 both, s3-%i", i);
+
+        go0 = in0;
+        go1 = in1;
+        for (j = 64; j < 84 && (go0 || go1); j++) {
+            efuse_read_both(i, j, &r0, &r1);
+            if (go0)
+                efuse0.dat[i][j] = r0 & 0xFF;
+            if (go1)
+                efuse1.dat[i][j] = r1 & 0xFF;
+
+            if (j == 67) {
+                if (go0 && (efuse0.macro.m2[i - 2].rx2.freq_start < 5000 ||
+                            efuse0.macro.m2[i - 2].rx2.freq_stop > 6000))
+                    go0 = false;
+                if (go1 && (efuse1.macro.m2[i - 2].rx2.freq_start < 5000 ||
+                            efuse1.macro.m2[i - 2].rx2.freq_stop > 6000))
+                    go1 = false;
+            }
+        }
+    }
+
+    LOGI("EFUSE1 both, s4");
+
+    // EFUSE_CFG = 0, EFUSE_RST = 0
+    SPI_Write(0, 0x3, 0x7D0, 0x00000000);
+    SPI_Write(0, 0x6, 0xFF0, 0x00000019);
+    SPI_Write(0, 0x3, 0x0E0, 0x00000000);
+
+    // The calibration write-back is per chip, so it stays per chip.
+    r0 = ((efuse0.macro.m1.ical & 0x1F) << 3) | (efuse0.macro.m1.rcal & 0x7);
+    SPI_Write(1, 0x6, 0xF14, efuse0.macro.m1.bandgap);
+    SPI_Write(1, 0x6, 0xF18, r0);
+
+    r1 = ((efuse1.macro.m1.ical & 0x1F) << 3) | (efuse1.macro.m1.rcal & 0x7);
+    SPI_Write(2, 0x6, 0xF14, efuse1.macro.m1.bandgap);
+    SPI_Write(2, 0x6, 0xF18, r1);
+
+    efuse_report(1, &efuse0);
+    efuse_report(2, &efuse1);
 }
 
 void DM6302_EFUSE2(uint8_t SEL6302) {
@@ -1760,11 +1906,16 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
         }
     }
 
-    DM6302_EFUSE1(1);
-    LOGI("EFUSE1 1 done");
+    if (g_setting.speed.fast_efuse) {
+        DM6302_EFUSE1_both();
+        LOGI("EFUSE1 both done");
+    } else {
+        DM6302_EFUSE1(1);
+        LOGI("EFUSE1 1 done");
 
-    DM6302_EFUSE1(2);
-    LOGI("EFUSE1 2 done");
+        DM6302_EFUSE1(2);
+        LOGI("EFUSE1 2 done");
+    }
 
     DM6302_Init1(0, bw);
     LOGI("Init1 done");

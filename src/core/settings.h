@@ -334,6 +334,12 @@ typedef struct {
     // the tuner and dispw underneath; the font preload is started earlier to
     // keep the first of those small.
     bool defer_menu;
+    // Read both tuner chips' factory calibration in one walk instead of one
+    // chip at a time. SPI_Read already returns both and a broadcast write
+    // addresses both, so the per-chip version was doing the whole walk twice.
+    // Both paths log a fingerprint of what they read, so the fast one can be
+    // checked against the slow one: same number, same calibration.
+    bool fast_efuse;
 } setting_speed_t;
 
 typedef struct {

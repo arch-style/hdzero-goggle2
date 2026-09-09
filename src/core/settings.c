@@ -123,6 +123,7 @@ const setting_t g_setting_defaults = {
         .skip_wifi_stop = false,
         .boot_display_early = false,
         .defer_menu = false,
+        .fast_efuse = false,
     },
     .bugfix = {
         .retry_tuner_init = false,
@@ -564,6 +565,7 @@ void settings_load(void) {
     g_setting.speed.skip_wifi_stop = settings_get_bool("speed", "skip_wifi_stop", g_setting_defaults.speed.skip_wifi_stop);
     g_setting.speed.boot_display_early = settings_get_bool("speed", "boot_display_early", g_setting_defaults.speed.boot_display_early);
     g_setting.speed.defer_menu = settings_get_bool("speed", "defer_menu", g_setting_defaults.speed.defer_menu);
+    g_setting.speed.fast_efuse = settings_get_bool("speed", "fast_efuse", g_setting_defaults.speed.fast_efuse);
 
     // input feedback
     // bug fixes
@@ -593,9 +595,10 @@ void settings_load(void) {
          g_setting.speed.async_tuner ? "on" : "off",
          g_setting.speed.spi_burst ? "on" : "off",
          g_setting.speed.skip_wifi_stop ? "on" : "off");
-    LOGI("speed: boot_display_early=%s defer_menu=%s",
+    LOGI("speed: boot_display_early=%s defer_menu=%s fast_efuse=%s",
          g_setting.speed.boot_display_early ? "on" : "off",
-         g_setting.speed.defer_menu ? "on" : "off");
+         g_setting.speed.defer_menu ? "on" : "off",
+         g_setting.speed.fast_efuse ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);

@@ -18,6 +18,7 @@ enum {
     ROW_KEEP_DISPLAY,
     ROW_SKIP_AUDIO,
     ROW_SPI_BURST,
+    ROW_FAST_EFUSE,
     ROW_HEAD_MENU,
     ROW_ANTIALIAS_OFF,
     ROW_HEAD_BOOT,
@@ -67,6 +68,7 @@ enum {
 #define SAVING_SKIP_WIFI_STOP "-1080ms after"
 #define SAVING_EARLY_TIMING   "est. -364ms"
 #define SAVING_DEFER_MENU     "est. -70..-240"
+#define SAVING_FAST_EFUSE     "est. -330ms"
 
 // panel_arr_t carries MAX_PANELS of them, so this page cannot outgrow it.
 _Static_assert(ROW_COUNT <= MAX_PANELS, "Performance page has more rows than MAX_PANELS");
@@ -97,7 +99,8 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
@@ -134,6 +137,7 @@ static btn_group_t btn_group_async_tuner;
 static btn_group_t btn_group_skip_wifi_stop;
 static btn_group_t btn_group_early_timing;
 static btn_group_t btn_group_defer_menu;
+static btn_group_t btn_group_fast_efuse;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
 
@@ -184,6 +188,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_SPI_BURST:
         return _lang("Tuner init 1663ms to 948ms. Hidden behind the display change at start-up.");
+
+    case ROW_FAST_EFUSE:
+        return _lang("Reads the tuner calibration once for both chips. Check the fingerprint in the log.");
 
     case ROW_ASYNC_TUNER:
         return _lang("Next start-up, straight to HDZero video only. Near zero unless Early Video Timing is on.");
@@ -289,6 +296,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
     create_toggle(&btn_group_spi_burst, cont, "Burst Tuner Writes",
                   g_setting.speed.spi_burst, SAVING_SPI_BURST, ROW_SPI_BURST);
+    create_toggle(&btn_group_fast_efuse, cont, "Dual-Chip EFUSE Read",
+                  g_setting.speed.fast_efuse, SAVING_FAST_EFUSE, ROW_FAST_EFUSE);
 
     create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
     create_toggle(&btn_group_antialias, cont, "Menu Antialias OFF",
@@ -469,6 +478,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_SPI_BURST:
         toggle_setting(&btn_group_spi_burst, &g_setting.speed.spi_burst, "spi_burst");
+        break;
+
+    case ROW_FAST_EFUSE:
+        toggle_setting(&btn_group_fast_efuse, &g_setting.speed.fast_efuse, "fast_efuse");
         break;
 
     case ROW_UI_THROTTLE:

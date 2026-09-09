@@ -74,7 +74,12 @@ extern "C" {
 #define RIGHT_BUTTON_IMG "right_button.png"
 #define ALERT_IMG        "alert.png"
 
-#define MAX_PANELS 26
+// Every page builds this many hidden selection panels, so it is a cost on
+// all of them; the Performance page is the only one that needs anything like
+// it. Raised with its row count rather than tracked per page, which would
+// mean getting the maximum right for the four pages that change theirs at
+// runtime. The static assert on that page is the guard.
+#define MAX_PANELS 32
 
 #define FLAG_SELECTABLE LV_OBJ_FLAG_USER_1
 #define STATE_DISABLED  LV_STATE_USER_1
