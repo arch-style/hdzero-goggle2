@@ -66,7 +66,7 @@ static lv_obj_t *page_fans_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
 
-    create_select_item(arr, cont);
+    create_select_item(arr, cont, GRID_ROWS(row_dsc));
 
     create_btn_group_item(&btn_group_fans, cont, 2, _lang("Auto Control"), _lang("On"), _lang("Off"), "", "", 0);
     create_slider_item(&slider_group[0], cont, _lang("Top Fan"), MAX_FAN_TOP, 2, 1);

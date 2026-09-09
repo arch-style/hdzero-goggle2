@@ -175,7 +175,18 @@ void btn_group_set_sel(btn_group_t *btn_group, int sel);
 int btn_group_get_sel(btn_group_t *btn_group);
 void btn_group_toggle_sel(btn_group_t *btn_group);
 
-void create_select_item(panel_arr_t *arr, lv_obj_t *parent);
+// Number of grid row tracks in a page's row_dsc[], which is one less than the
+// array holds because of the LV_GRID_TEMPLATE_LAST terminator. A selection
+// panel is only ever shown on a row the page has a track for, so this is the
+// most panels that page can possibly need: derived rather than written out, so
+// a page that gains a row gains its panel with it.
+#define GRID_ROWS(row_dsc_array) ((int)(sizeof(row_dsc_array) / sizeof((row_dsc_array)[0]) - 1))
+
+// Builds count hidden selection panels, one per row. Every page used to build
+// MAX_PANELS of them whatever it needed -- around seven hundred objects across
+// the menu, on the build that Defer Menu Build exists to move off the boot
+// path. count is clamped to MAX_PANELS, which is the size of arr->panel.
+void create_select_item(panel_arr_t *arr, lv_obj_t *parent, int count);
 void set_select_item(const panel_arr_t *arr, int row);
 
 void slider_show(slider_group_t *slider_group, bool visible);

@@ -760,7 +760,7 @@ static lv_obj_t *page_wifi_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
 
-    create_select_item(arr, cont);
+    create_select_item(arr, cont, GRID_ROWS(row_dsc));
 
     create_btn_group_item(&page_wifi.page_select.button, cont, 3, _lang("Page"), _lang("Basic"), _lang("Advanced"), _lang("System"), "", 0);
     page_wifi_create_page_1(cont);

@@ -111,11 +111,8 @@ static lv_coord_t col_dsc[] = {90, 340, 175, 175, 180, 0, LV_GRID_TEMPLATE_LAST}
 // the rows stopped. Anything past this still scrolls.
 #define PERF_VISIBLE_H (780 - PERF_ROW_H) // one row given back to the comment
 
-// MAX_PANELS entries, not ROW_COUNT: create_select_item() places a hidden
-// selection panel on every row up to MAX_PANELS and a panel needs its track
-// to exist. The tracks past ROW_BACK cost no height -- the grid layout skips
-// hidden children and lv_obj_get_scroll_bottom() only measures visible ones --
-// so the list still ends where "Back" does.
+// One track per row and no more: create_select_item() is given GRID_ROWS(row_dsc)
+// so the panels it builds and the tracks they sit on are the same count.
 static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
@@ -406,7 +403,7 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
 
-    create_select_item(arr, cont);
+    create_select_item(arr, cont, GRID_ROWS(row_dsc));
 
     create_heading(cont, arr, "Menu / Video Switch", ROW_HEAD_SWITCH);
     create_toggle(&btn_group_tuner, cont, "Keep Tuner Alive",

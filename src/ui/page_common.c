@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <log/log.h>
+
 #include "lang/language.h"
 #include "ui/ui_attribute.h"
 
@@ -50,9 +52,21 @@ int create_text(struct menu_obj_s *s, lv_obj_t *parent, bool is_icon, const char
     return 0;
 }
 
-void create_select_item(panel_arr_t *arr, lv_obj_t *parent) {
+void create_select_item(panel_arr_t *arr, lv_obj_t *parent, int count) {
     int i;
-    for (i = 0; i < MAX_PANELS; ++i) {
+
+    if (count > MAX_PANELS) {
+        // arr->panel holds MAX_PANELS, so this is the one way the caller can
+        // be wrong that is worth saying out loud: the page's rows past this
+        // point have no panel and cannot be selected.
+        LOGE("create_select_item: %d rows asked for, %d is the maximum", count, MAX_PANELS);
+        count = MAX_PANELS;
+    }
+
+    if (count < 1)
+        count = 1;
+
+    for (i = 0; i < count; ++i) {
         arr->panel[i] = lv_obj_create(parent);
         lv_obj_clear_flag(arr->panel[i], LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(arr->panel[i], LV_OBJ_FLAG_HIDDEN);

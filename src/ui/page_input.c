@@ -234,7 +234,7 @@ static lv_obj_t *page_input_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_column_dsc_array(content, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(content, row_dsc, 0);
 
-    create_select_item(arr, content);
+    create_select_item(arr, content, GRID_ROWS(row_dsc));
 
     snprintf(buf, sizeof(buf), "%s:", _lang("Roller"));
     create_label_item(content, buf, 1, ROLLER, 1);
