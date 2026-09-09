@@ -304,61 +304,52 @@ static void dvr_update_record_conf() {
     ini_putl("record", "naming", g_setting.record.naming, REC_CONF);
 }
 
-// gogglecmd only asks the record process to stop; the file is still open when
-// it returns, which is what the sleep was covering. But the record process
-// writes its status after ffpack_close(), so the file says when the close is
-// actually done and there is no reason to pay the worst case every time.
+// gogglecmd only asks the record process to do something; it has not done it
+// when the command returns, which is what the sleeps were covering. But the
+// record process writes its status to REC_dataFILE either side of the work --
+// REC_statusRun once the encoder is going and the file is open, the stop
+// status after ffpack_close() -- so the file says when it is actually done.
 //
-// Anything that is not "recording" ends the wait, an unreadable file
-// included: none of those can mean a recording is still open. The status can
-// only be stale if a stop follows a start too closely for the record process
-// to have written "recording" yet, and the start path still sleeps its two
-// seconds, so that cannot happen from here.
-static void dvr_wait_stopped(void) {
-    uint32_t t0;
+// Anything other than the state asked for ends the wait, an unreadable file
+// included: none of those can mean the recording is in the state we are
+// waiting to leave.
+static void dvr_poll_status(bool want_recording, const char *what) {
+    uint32_t t0 = time_ms();
 
+    while (time_ms() - t0 < DVR_WAIT_MS) {
+        if ((dvr_read_status() == DVR_STATUS_RECORDING) == want_recording)
+            break;
+
+        usleep(DVR_POLL_MS * 1000);
+    }
+
+    LOGI("dvr: record %s took %ums", what, time_ms() - t0);
+}
+
+// Left true when a stop was issued and not waited for. The next start is the
+// one thing that has to see the old file closed, so it collects it.
+static bool dvr_stop_outstanding = false;
+
+static void dvr_wait_stopped(void) {
     if (!g_setting.speed.dvr_stop_wait) {
         sleep(2); // wait for record process
         return;
     }
 
-    t0 = time_ms();
-
-    while (time_ms() - t0 < DVR_WAIT_MS) {
-        if (dvr_read_status() != DVR_STATUS_RECORDING)
-            break;
-
-        usleep(DVR_POLL_MS * 1000);
-    }
-
-    LOGI("dvr: record stop took %ums", time_ms() - t0);
+    dvr_poll_status(false, "stop");
 }
 
-// The mirror of it: record_saveStatus(REC_statusRun) runs once the encoder is
-// going and the file is open, so that is what a start is waiting for.
-//
 // was_running is the status from before the start command went out, and it
 // should be anything but "recording". If it already said "recording" the file
 // is stale -- an earlier run that never wrote its stop -- and polling for a
 // value that is already there would return at once, so the flat wait stands.
 static void dvr_wait_started(bool was_running) {
-    uint32_t t0;
-
     if (!g_setting.speed.dvr_start_wait || was_running) {
         sleep(2); // wait for record process
         return;
     }
 
-    t0 = time_ms();
-
-    while (time_ms() - t0 < DVR_WAIT_MS) {
-        if (dvr_read_status() == DVR_STATUS_RECORDING)
-            break;
-
-        usleep(DVR_POLL_MS * 1000);
-    }
-
-    LOGI("dvr: record start took %ums", time_ms() - t0);
+    dvr_poll_status(true, "start");
 }
 
 void dvr_cmd(osd_dvr_cmd_t cmd) {
@@ -385,6 +376,15 @@ void dvr_cmd(osd_dvr_cmd_t cmd) {
 
     if (start_rec) {
         if (!dvr_is_recording && !sdcard_is_full()) {
+            // A stop that was left to finish has to be finished now: this is
+            // the only thing between here and there that needed the old file
+            // closed. Polled rather than slept whatever the stop switch says,
+            // since deferring the stop is what asked for this.
+            if (dvr_stop_outstanding) {
+                dvr_poll_status(false, "stop collected");
+                dvr_stop_outstanding = false;
+            }
+
             // Read before the command goes out, so the wait can tell a fresh
             // "recording" from one left behind by an earlier run. Not read at
             // all with the poll off, so that path is the original one exactly.
@@ -405,9 +405,25 @@ void dvr_cmd(osd_dvr_cmd_t cmd) {
         if (dvr_is_recording) {
             dvr_is_recording = false;
             system_script(REC_STOP);
-            // On the menu switch this runs with lvgl_mutex held, so whatever
-            // it costs is time the menu is not drawn.
-            dvr_wait_stopped();
+
+            if (g_setting.speed.dvr_defer_stop) {
+                // Measured on the goggles: the record process will not
+                // finalise a recording until about three seconds after it
+                // started, so stopping sooner waits out the remainder. That is
+                // the two seconds on a channel change, and on going to the
+                // menu straight after the picture arrives.
+                //
+                // Nothing between here and the next recording needs the old
+                // file closed -- the channel change, the display timing and
+                // the vi conf write are all its own -- so the wait moves to
+                // the start, which does need it.
+                dvr_stop_outstanding = true;
+                LOGI("dvr: record stop left to finish in the background");
+            } else {
+                // On the menu switch this runs with lvgl_mutex held, so
+                // whatever it costs is time the menu is not drawn.
+                dvr_wait_stopped();
+            }
         }
     }
 

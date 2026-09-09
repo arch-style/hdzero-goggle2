@@ -128,6 +128,7 @@ const setting_t g_setting_defaults = {
         .dvr_stop_wait = false,
         .dvr_start_wait = false,
         .menu_async_display = false,
+        .dvr_defer_stop = false,
     },
     .bugfix = {
         .retry_tuner_init = false,
@@ -597,6 +598,7 @@ void settings_load(void) {
     g_setting.speed.dvr_stop_wait = settings_get_bool("speed", "dvr_stop_wait", g_setting_defaults.speed.dvr_stop_wait);
     g_setting.speed.dvr_start_wait = settings_get_bool("speed", "dvr_start_wait", g_setting_defaults.speed.dvr_start_wait);
     g_setting.speed.menu_async_display = settings_get_bool("speed", "menu_async_display", g_setting_defaults.speed.menu_async_display);
+    g_setting.speed.dvr_defer_stop = settings_get_bool("speed", "dvr_defer_stop", g_setting_defaults.speed.dvr_defer_stop);
 
     // input feedback
     // bug fixes
@@ -626,13 +628,14 @@ void settings_load(void) {
          g_setting.speed.async_tuner ? "on" : "off",
          g_setting.speed.spi_burst ? "on" : "off",
          g_setting.speed.skip_wifi_stop ? "on" : "off");
-    LOGI("speed: boot_display_early=%s defer_menu=%s fast_efuse=%s dvr_stop_wait=%s dvr_start_wait=%s menu_async_display=%s",
+    LOGI("speed: boot_display_early=%s defer_menu=%s fast_efuse=%s dvr_stop_wait=%s dvr_start_wait=%s menu_async_display=%s dvr_defer_stop=%s",
          g_setting.speed.boot_display_early ? "on" : "off",
          g_setting.speed.defer_menu ? "on" : "off",
          g_setting.speed.fast_efuse ? "on" : "off",
          g_setting.speed.dvr_stop_wait ? "on" : "off",
          g_setting.speed.dvr_start_wait ? "on" : "off",
-         g_setting.speed.menu_async_display ? "on" : "off");
+         g_setting.speed.menu_async_display ? "on" : "off",
+         g_setting.speed.dvr_defer_stop ? "on" : "off");
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);

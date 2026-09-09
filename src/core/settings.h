@@ -359,6 +359,15 @@ typedef struct {
     // The panel blanks at the button press rather than after the recorder
     // has stopped.
     bool menu_async_display;
+    // Do not wait for the record process to close its file at all: ask it to
+    // stop and carry on. Measured on the goggles, it will not finalise a
+    // recording until about three seconds after it started, so a stop sooner
+    // than that waits out the remainder -- which is the pause on a channel
+    // change, and on going to the menu straight after the picture arrives.
+    // The wait moves to the next start, the one thing that needs the old file
+    // closed. What runs in between is the channel change and the display
+    // timing, which are not the recorder's.
+    bool dvr_defer_stop;
 } setting_speed_t;
 
 typedef struct {
