@@ -148,10 +148,14 @@ void start_running(void) {
 // and a picture needs it. The motion timer in ht.c would start reading it a
 // second after ht_init() whether it was up or not, so that timer stays idle
 // until ht_set_imu_ready() is called after the join below.
+//
+// Written by the worker, read after the join, so no barrier of its own.
+static bool imu_up = false;
+
 static void *imu_init_worker(void *arg) {
     (void)arg;
 
-    enable_bmi270();
+    imu_up = enable_bmi270();
 
     return NULL;
 }
@@ -197,9 +201,9 @@ static void device_init(void) {
         if (pthread_create(&imu_init_thread, NULL, imu_init_worker, NULL) == 0)
             imu_init_running = true;
         else
-            enable_bmi270();
+            imu_up = enable_bmi270();
     } else {
-        enable_bmi270();
+        imu_up = enable_bmi270();
     }
 
     // On the tuner's own bus, so before the workers raise its clock.
@@ -366,7 +370,14 @@ int main(int argc, char *argv[]) {
         imu_init_running = false;
         LOGI("boot phase: waited %ums for the motion sensor", time_ms() - step_ms);
     }
-    ht_set_imu_ready();
+    // Only if it actually came up. get_bmi270() polls a data-ready flag in an
+    // unbounded loop with the I2C mutex held, so a 100Hz timer reading a
+    // sensor that never answers is a thread that never returns, on the bus the
+    // FPGA and the tuner also use.
+    if (imu_up)
+        ht_set_imu_ready();
+    else
+        LOGE("motion sensor did not come up, head tracking stays idle");
 
     // 8. Start threads
     start_running();
