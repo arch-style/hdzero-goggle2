@@ -10,61 +10,26 @@
 
 ## 1. 不具合
 
-### 1.1 アンチエイリアスが映像に戻っても復帰しない
+セクション 1 にあった 5 件は 2026-09-10 にすべて修正した。内容は
+[fork-changes.md](fork-changes.md) の 4.8〜4.13 に移した。
 
-`ui_main_menu.c` の `main_menu_apply_antialiasing()` は
-`menu_antialias_off && menu_scaled && main_menu_is_shown()` で判定する。復帰は
-`main_menu_show(false)` の分岐にあるが、**`main_menu_show(false)` はどこからも
-呼ばれない** — メニューは OSD 画面に覆われるだけで HIDDEN にならない。
+新しく見つかった未修正のものはここに追記する。
 
-- **条件:** Menu Antialias OFF + Menu Over Video + 720p 映像
-- **症状:** 映像に戻っても `disp_drv.antialiasing` が 0 のままで、OSD と全ウィジェット
-  がギザギザ。角丸や影にも効く
-- **修正案:** `app_exit_menu()` で `menu_scaled` / 表示中を無視して復帰させるか、
-  実際にメニューを HIDDEN にする
-- **注意:** `417950c` で `main_menu_refit_display()` が
-  `main_menu_apply_antialiasing()` を呼ぶようになったので、Playback を経由した場合は
-  部分的に直っている可能性がある。**着手前に現状を実機で確認すること**
+### 1.1 起動時の I2C 競合が再発する（相手が不明）
 
-### 1.2 ステータスバーの差分判定が省略記号付きラベルで常に失敗
+[fork-changes.md 4.2](fork-changes.md) の対処 (`1d62e02`) を入れた後も、
+2026-09-10 の起動で `boot step: wait for the tuner bus 10080ms` / boot total
+13222ms が出た。メインスレッドは 10 秒間 join で待っていたので **OLED ではない**。
+`DM6302_init()` の中で 2 回、ログが沈黙する空白がある (Init14 の前に 4.6 秒、
+M0 転送 64→128 の間に 5.1 秒)。
 
-`ui_statusbar.c` の `sb_label()` は `lv_label_get_text()` と比較する。ところが
-LVGL 8.3 の `LV_LABEL_LONG_DOT` は**ラベル内部の文字列を「…」で上書きする**
-(`lv_label.c` の 1140 行付近)。
+計測は入れた (`6c44c0e`)。`i2c_bus_lock()` の待ちが 100ms を超えると、ポート・
+待ったスレッド・渡したスレッドを出す。**次の再発ログを待つ。**
 
-`STS_SDCARD` を除く全ラベルが `LONG_DOT` で、幅 267px を超えると毎回不一致になる。
-結果、Skip Idle Redraws を ON にしても差分判定がすり抜け、20Hz で全画面再描画が
-走る。縮小表示中のメニューなら 5.6MB の ARGB レイヤーを毎回作り直すことになる。
-
-- **修正案:** バー側で最後に設定した文字列を保持して比較する
-
-### 1.3 オーバーレイ中にカメラ解像度が変わると OSD がメニューの上に出る
-
-`osd.c` の `fhd_change()` は `osd_hdzero_update()` から無条件に呼ばれる。
-Menu Over Video では `Display_UI()` を呼ばないので `source_mode` が HDZERO のままで、
-`HDZERO_detect()` が動き続ける。720p↔1080p の変化で `fhd_req` が立ち、
-`fhd_change()` が `osd_show(true)` するのでメニューが OSD の下に隠れる。ダイヤルは
-メニューを操作し続け、拡大率も古いまま。
-
-- **修正案:** `g_app_state == APP_STATE_VIDEO` のときだけ `fhd_change()` を走らせる
-
-### 1.4 お気に入りの帯域外スロットが「L1」等と表示される
-
-`channel2str()` は範囲外チャンネルで先頭要素を返す。Raceband で登録した F 帯を
-Lowband 表示中に見ると、本物の L1 と区別できない。`slot_usable()` はそれを飛ばすので、
-**見えているのに選べない**状態になる。
-
-- **修正案:** `slot_label_update()` で帯域外を明示表示する
-
-### 1.5 IMU 初期化失敗時もゲートを開ける
-
-`main.c` の `ht_set_imu_ready()` は無条件。`enable_bmi270()` は `void` で失敗をログ
-するだけ。失敗時は 100Hz の `SIGEV_THREAD` タイマーが毎回 `get_bmi270()` の無限ループ
-スレッドを生み、`i2c_mutex` を占有する。純正と同じ挙動だが、ゲートがあるので直せる位置。
-
-- **修正案:** `enable_bmi270()` に戻り値を持たせ、成功時のみ `ht_set_imu_ready()`
-- **補足:** `ht.c` のコメント「FPGA とバスを共有」は誤り。BMI270 はポート 1、
-  FPGA はポート 2。共有しているのは `i2c_mutex` だけ
+- 出なかった場合: バス待ちではなく、カーネルドライバか FPGA 側の応答が遅い。
+  1 転送ごとの計測に降りる必要がある
+- 出た場合: スレッド ID を `boot: main thread` /
+  `HDZero: async open on thread` と突き合わせれば相手が分かる
 
 ---
 
