@@ -16,6 +16,7 @@ void input_device_init();
 void tune_channel(uint8_t key);
 void tune_channel_timer();
 void tune_channel_confirm();
+void tune_channel_next();
 void exit_tune_channel();
 void rbtn_click(right_button_t click_type);
 

@@ -233,6 +233,29 @@ void source_cycle() {
     }
 }
 
+// Narrow halves the RF bandwidth: less range, but neighbouring channels
+// interfere less. It is an HDZero setting, so on any other source this only
+// records the choice for the next time HDZero comes up.
+//
+// The picture has to be rebuilt, because the bandwidth is set inside the
+// tuner init that app_switch_to_hdzero() runs; HDZero_open() sees the change
+// and closes and reopens the receivers itself.
+void source_toggle_hdzero_bw() {
+    g_setting.source.hdzero_bw = (g_setting.source.hdzero_bw == SETTING_SOURCES_HDZERO_BW_WIDE)
+                                     ? SETTING_SOURCES_HDZERO_BW_NARROW
+                                     : SETTING_SOURCES_HDZERO_BW_WIDE;
+    ini_putl("source", "hdzero_bw", g_setting.source.hdzero_bw, SETTING_INI);
+
+    // Keep the row on this page in step. Before the page is built its button
+    // group holds no buttons, and this is then a no-op.
+    btn_group_set_sel(&btn_group1, g_setting.source.hdzero_bw);
+
+    if (g_source_info.source == SOURCE_HDZERO) {
+        dvr_cmd(DVR_STOP);
+        app_switch_to_hdzero(true);
+    }
+}
+
 static void page_source_on_click(uint8_t key, int sel) {
     switch (sel) {
     case 0: // HDZero in
