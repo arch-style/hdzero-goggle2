@@ -17,6 +17,10 @@ media.tar.gz
 .DS_Store
 utilities/font/out
 *.bz2
+# The archive of goggle logs pulled off the SD card by
+# utilities/save-goggle-logs.sh. It is a working set, not a record: the ones
+# a document actually cites are committed under docs/logs/ instead.
+/logs
 
 # nix related
 result
