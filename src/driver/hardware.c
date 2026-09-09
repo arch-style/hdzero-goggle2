@@ -1,6 +1,8 @@
 #include "hardware.h"
 
 #include <pthread.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -617,6 +619,12 @@ bool vdpo_timing_applied(void) {
     return vdpo_applied_once;
 }
 
+static bool vdpo_pending = false;
+
+bool vdpo_timing_pending(void) {
+    return vdpo_pending;
+}
+
 // dispw is over a second and it configures the SoC's display output, which
 // has nothing to do with the tuner coming up on the FPGA's I2C. Run it on a
 // worker started before the tuner init, and collect it where the timing is
@@ -624,7 +632,6 @@ bool vdpo_timing_applied(void) {
 // before changing the mode and a mode change on a live panel is not something
 // to find out about the hard way.
 static pthread_t vdpo_thread;
-static bool vdpo_pending = false;
 static vdpo_tmg_t vdpo_pending_tmg;
 static char vdpo_pending_mode[16];
 
@@ -898,8 +905,22 @@ static pthread_t hdz_async_thread;
 static bool hdz_async_pending = false;
 static int hdz_async_bw;
 
+// The worker goes through HDZero_open() and, on a bandwidth change,
+// HDZero_Close(), both of which collect the worker first. It must recognise
+// itself there: joining oneself does not fail on musl, it waits forever, and
+// the first build did exactly that while the main thread ran the init
+// inline, none the wiser.
+static __thread bool hdz_in_worker = false;
+
 static void *hdz_async_worker(void *arg) {
     (void)arg;
+
+    hdz_in_worker = true;
+
+    // Behind the main thread for the CPU: the UI build is on the critical
+    // path and the init mostly waits on the bus anyway. Linux applies the
+    // priority per thread when given the thread id.
+    setpriority(PRIO_PROCESS, syscall(SYS_gettid), 10);
 
     HDZero_open(hdz_async_bw);
 
@@ -911,13 +932,11 @@ bool HDZero_open_pending(void) {
 }
 
 static void hdz_async_collect(void) {
-    if (!hdz_async_pending)
+    if (!hdz_async_pending || hdz_in_worker)
         return;
 
-    // The flag comes down before the join, because the worker itself is
-    // inside HDZero_open() and must not try to collect itself.
-    hdz_async_pending = false;
     pthread_join(hdz_async_thread, NULL);
+    hdz_async_pending = false;
     LOGI("HDZero: async open collected");
 }
 
@@ -926,12 +945,14 @@ void HDZero_open_async_start(int bw) {
         return;
 
     hdz_async_bw = bw;
+    // Raised before the create so the worker sees it from its first line.
+    hdz_async_pending = true;
     if (pthread_create(&hdz_async_thread, NULL, hdz_async_worker, NULL) != 0) {
+        hdz_async_pending = false;
         LOGE("HDZero: could not start the async open, it will run inline");
         return;
     }
 
-    hdz_async_pending = true;
     LOGI("HDZero: async open started");
 }
 

@@ -20,24 +20,44 @@
 #define WAIT(ms) usleep((ms)*1000)
 
 // One SPI access is a sequence of FPGA register writes and reads, and only
-// the individual I2C transfers are serialised by i2c_mutex. Two threads
+// the individual I2C transfers are serialised by the bus lock. Two threads
 // interleaving their sequences would mix up the bridge, so the sequence as a
 // whole is serialised here. Needed once the tuner init runs on a worker.
 static pthread_mutex_t spi_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // The burst is a single ioctl carrying every register write of the sequence;
-// the driver sends them with a repeated START between. If the kernel or the
-// FPGA refuses it the sequence is redone one write at a time and the burst is
-// not tried again, so a refusal costs one failed ioctl for the session.
+// the driver sends them with a repeated START between. On the goggles it is
+// refused once per init, always around the same point, and works before and
+// after: most likely the bridge is still shifting the previous SPI command
+// out when the next burst arrives with no gap. So a refusal is retried once
+// after a pause and then that one sequence is redone a register at a time.
+// Only a run of refusals disables the burst for the session.
+#define SPI_BURST_REFUSALS_MAX 20
+#define SPI_BURST_REFUSALS_LOGGED 5
+
 static bool spi_burst_refused = false;
+static unsigned spi_burst_refusals = 0;
 
 static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t count) {
     if (g_setting.speed.spi_burst && !spi_burst_refused) {
+        int err = I2C_Write_Burst(ADDR_FPGA, regs, vals, count);
+
+        if (err == 0)
+            return true;
+
+        usleep(300);
         if (I2C_Write_Burst(ADDR_FPGA, regs, vals, count) == 0)
             return true;
 
-        spi_burst_refused = true;
-        LOGE("SPI: burst write refused, back to one register per transfer");
+        spi_burst_refusals++;
+        if (spi_burst_refusals <= SPI_BURST_REFUSALS_LOGGED)
+            LOGE("SPI: burst refused (errno %d) at page %x addr %02x%02x, %u so far",
+                 -err, vals[1] >> 4, vals[1] & 0x0F, vals[0], spi_burst_refusals);
+
+        if (spi_burst_refusals >= SPI_BURST_REFUSALS_MAX) {
+            spi_burst_refused = true;
+            LOGE("SPI: burst disabled after %u refusals", spi_burst_refusals);
+        }
     }
 
     for (uint8_t i = 0; i < count; i++)
@@ -1693,12 +1713,12 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     int to_cnt = 0;
     uint32_t r0 = 1, r1 = 1;
 
-    // The bus clock is changed under i2c_mutex so no transfer is in flight
+    // The bus clock is changed under the bus lock so no transfer is in flight
     // on it; with the init on a worker the OLED and display set-up share the
     // bus at the time.
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(2);
     system_exec("aww 0x05002814 0x00000008"); // set i2c speed to 1MHz
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(2);
 
     while (r0) {
         DM5680_ResetRF(0);
@@ -1785,9 +1805,9 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     DM6302_M0();
     LOGI("M0 done");
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(2);
     system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(2);
 
     // Recorded, never judged. Checking 0x6/0xFF0 for 0x18 here was wrong:
     // DM6302_M0() writes zero to that register on its first line to load the

@@ -1,5 +1,6 @@
 #include "i2c.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/i2c-dev.h>
 #include <linux/i2c.h>
@@ -15,9 +16,31 @@
 
 #include "../core/common.hh"
 
-pthread_mutex_t i2c_mutex;
-
 #define IIC_PORTS 4
+
+// One lock per port, since the ports are separate controllers: the motion
+// sensor on port 1 need not wait for the tuner init on port 2. Each lock is
+// a bus mutex behind a turnstile, so a thread that has just released the bus
+// cannot take it straight back while another is waiting: the waiter holds the
+// turnstile, and the returning thread queues behind it. Without that the
+// tuner init, which issues transfers back to back, starved the OLED and
+// display set-up on the same port for hundreds of milliseconds.
+typedef struct {
+    pthread_mutex_t turnstile;
+    pthread_mutex_t bus;
+} iic_lock_t;
+
+static iic_lock_t g_iic_locks[IIC_PORTS];
+
+void i2c_bus_lock(int port) {
+    pthread_mutex_lock(&g_iic_locks[port].turnstile);
+    pthread_mutex_lock(&g_iic_locks[port].bus);
+    pthread_mutex_unlock(&g_iic_locks[port].turnstile);
+}
+
+void i2c_bus_unlock(int port) {
+    pthread_mutex_unlock(&g_iic_locks[port].bus);
+}
 
 static char *IIC_DEVS[IIC_PORTS] = {
     "/dev/i2c-0",
@@ -44,7 +67,10 @@ bool iic_is_port_ready(int port) {
 }
 
 void iic_init() {
-    pthread_mutex_init(&i2c_mutex, NULL);
+    for (int i = 0; i < IIC_PORTS; ++i) {
+        pthread_mutex_init(&g_iic_locks[i].turnstile, NULL);
+        pthread_mutex_init(&g_iic_locks[i].bus, NULL);
+    }
 
     // Offset starts with 1 as it is not referenced thus far.
     for (int i = 1; i < IIC_PORTS; ++i) {
@@ -163,7 +189,7 @@ static int iic_write_n(int i2c_fd, uint8_t slave_address, uint8_t reg_address, u
 // I2C_RDWR_IOCTL_MAX_MSGS is 42 in the kernel; the tuner's SPI bridge needs 7.
 #define IIC_BURST_MAX 16
 
-int8_t i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const uint8_t *vals, uint8_t count) {
+int i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const uint8_t *vals, uint8_t count) {
     struct i2c_rdwr_ioctl_data work_queue;
     struct i2c_msg msgs[IIC_BURST_MAX];
     uint8_t bufs[IIC_BURST_MAX][2];
@@ -187,11 +213,12 @@ int8_t i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, con
     work_queue.nmsgs = count;
     work_queue.msgs = msgs;
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(port);
     ret = ioctl(g_iic_fds[port], I2C_RDWR, (unsigned long)&work_queue);
-    pthread_mutex_unlock(&i2c_mutex);
+    int err = errno;
+    i2c_bus_unlock(port);
 
-    return ret < 0 ? -1 : 0;
+    return ret < 0 ? -err : 0;
 }
 
 uint8_t i2c_read(int port, uint8_t slave_address, uint8_t addr) {
@@ -201,9 +228,9 @@ uint8_t i2c_read(int port, uint8_t slave_address, uint8_t addr) {
         return 0;
     }
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(port);
     val = iic_read(g_iic_fds[port], slave_address, addr);
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(port);
 
     return val;
 }
@@ -213,9 +240,9 @@ int8_t i2c_read_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *data, 
         return -1;
     }
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(port);
     iic_read_n(g_iic_fds[port], slave_address, addr, data, len);
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(port);
 
     return 0;
 }
@@ -227,9 +254,9 @@ int i2c_write(int port, uint8_t slave_address, uint8_t addr, uint8_t val) {
         return ret;
     }
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(port);
     ret = iic_write(g_iic_fds[port], slave_address, addr, val);
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(port);
 
     return ret;
 }
@@ -241,9 +268,9 @@ int8_t i2c_write_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *val, 
         return ret;
     }
 
-    pthread_mutex_lock(&i2c_mutex);
+    i2c_bus_lock(port);
     iic_write_n(g_iic_fds[port], slave_address, addr, val, len);
-    pthread_mutex_unlock(&i2c_mutex);
+    i2c_bus_unlock(port);
 
     return 0;
 }

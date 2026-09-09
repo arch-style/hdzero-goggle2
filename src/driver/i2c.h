@@ -14,14 +14,15 @@ int8_t i2c_read_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *data, 
 int8_t i2c_write_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *val, uint16_t len);
 
 // Several single-register writes to one device in a single I2C_RDWR ioctl,
-// one message per register, a repeated START between them. Returns -1 if the
-// driver refuses the transaction, so callers can fall back to one write each.
-int8_t i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const uint8_t *vals, uint8_t count);
+// one message per register, a repeated START between them. Returns -errno if
+// the driver refuses the transaction, so callers can fall back to one write
+// each.
+int i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const uint8_t *vals, uint8_t count);
 
-// Held for every transfer on every port. Exposed so a caller can change a
-// bus's clock with no transfer in flight.
-#include <pthread.h>
-extern pthread_mutex_t i2c_mutex;
+// The per-port lock every transfer takes. Exposed so a caller can change a
+// bus's clock with no transfer in flight on it.
+void i2c_bus_lock(int port);
+void i2c_bus_unlock(int port);
 
 #define BMI_I2C_WRITE(addr, val, len) i2c_write_n(1, 0x68, addr, val, len)
 #define BMI_I2C_READ(addr, val, len)  i2c_read_n(1, 0x68, addr, val, len)

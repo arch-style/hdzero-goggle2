@@ -98,6 +98,9 @@ void Display_UI_init();
 // True once dispw has actually been run, so callers can tell a real display
 // state from the assumed boot one.
 bool vdpo_timing_applied(void);
+// True while a background timing change has been started and not yet
+// collected by vdpo_set_timing().
+bool vdpo_timing_pending(void);
 // Begin a display timing change in the background; the next vdpo_set_timing()
 // for the same timing collects it instead of running dispw itself.
 void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode);

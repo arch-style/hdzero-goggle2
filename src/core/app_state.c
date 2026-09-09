@@ -228,6 +228,21 @@ static void start_display_timing_early(void) {
     }
 }
 
+// The part of the HDZero switch that is about recording and audio rather than
+// the picture: independent of the display timing, so it can run either side
+// of the wait for it.
+static void hdzero_recording_side(void) {
+    g_setting.autoscan.last_source = SETTING_AUTOSCAN_SOURCE_HDZERO;
+    ini_putl("autoscan", "last_source", g_setting.autoscan.last_source, SETTING_INI);
+
+    dvr_select_audio_source(g_setting.record.audio_source);
+    dvr_enable_line_out(false);
+
+    dvr_update_vi_conf(CAM_MODE);
+    LOGI("switch mark: dvr configured");
+    system_script(REC_STOP_LIVE);
+}
+
 void app_switch_to_hdzero(bool is_default) {
     int ch;
     LOGI("switch mark: to_hdzero start");
@@ -261,6 +276,19 @@ void app_switch_to_hdzero(bool is_default) {
     DM5680_req_vldflg();
     progress_bar.start = 0;
     LOGI("switch mark: channel tuned");
+
+    // The audio and recorder set-up below is half a second of forked
+    // scripts that has nothing to do with the display. When the timing
+    // change is still running in the background, which it is whenever the
+    // tuner was already up, do that work now instead of after waiting for
+    // it; otherwise the picture comes first, as before.
+    bool side_done = false;
+
+    if (g_setting.speed.async_display && vdpo_timing_pending()) {
+        LOGI("switch mark: audio and dvr while the display changes");
+        hdzero_recording_side();
+        side_done = true;
+    }
 
     switch (CAM_MODE) {
     case VR_720P50:
@@ -301,14 +329,7 @@ void app_switch_to_hdzero(bool is_default) {
     Display_Osd(g_setting.record.osd);
     LOGI("switch mark: lvgl + osd");
 
-    g_setting.autoscan.last_source = SETTING_AUTOSCAN_SOURCE_HDZERO;
-    ini_putl("autoscan", "last_source", g_setting.autoscan.last_source, SETTING_INI);
-
-    dvr_select_audio_source(g_setting.record.audio_source);
-    dvr_enable_line_out(false);
-
-    dvr_update_vi_conf(CAM_MODE);
-    LOGI("switch mark: dvr configured");
-    system_script(REC_STOP_LIVE);
+    if (!side_done)
+        hdzero_recording_side();
     LOGI("switch mark: to_hdzero done");
 }
