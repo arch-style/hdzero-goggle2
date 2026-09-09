@@ -53,10 +53,19 @@ void app_menu_end_overlay(void) {
         return;
 
     menu_over_video = false;
-    LOGI("switch mark: ending the overlay");
 
-    Display_UI();
-    lvgl_switch_to_1080p();
+    if (g_setting.speed.playback_keep_timing) {
+        // Take the display at the timing the video was already using. Only
+        // dispw is skipped: the FPGA source select, the clock phases and the
+        // OLED mode all still move, and LVGL stays where it is so that what
+        // the player draws matches what the panel is showing.
+        LOGI("switch mark: ending the overlay, keeping the timing");
+        Display_UI_keep_timing();
+    } else {
+        LOGI("switch mark: ending the overlay");
+        Display_UI();
+        lvgl_switch_to_1080p();
+    }
 
     if (g_setting.speed.fast_menu)
         HDZero_Standby();

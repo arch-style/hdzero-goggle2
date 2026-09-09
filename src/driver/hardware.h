@@ -111,6 +111,10 @@ void vdpo_timing_collect(void);
 // for the same timing collects it instead of running dispw itself.
 void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode);
 void Display_UI();
+// Display_UI() without the dispw: takes the display for the UI at whatever
+// timing is already running. Only for callers that size what they draw to the
+// display rather than assuming 1080p.
+void Display_UI_keep_timing(void);
 void Display_720P90(int mode);
 void Display_720P60_50(int mode, uint8_t is_43);
 void Display_1080P30(int mode);

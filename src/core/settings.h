@@ -368,6 +368,13 @@ typedef struct {
     // closed. What runs in between is the channel change and the display
     // timing, which are not the recorder's.
     bool dvr_defer_stop;
+    // Leave the display on the video's timing when Menu Over Video hands it to
+    // the UI for playback, instead of running dispw to put it back to 1080p50.
+    // Everything else in that handover is I2C and aww, and the panel timing is
+    // a function of the resolution rather than of UI versus video, so the only
+    // thing being skipped is the 1.1s. The player's layer and the VO rectangle
+    // follow the display either way.
+    bool playback_keep_timing;
 } setting_speed_t;
 
 typedef struct {

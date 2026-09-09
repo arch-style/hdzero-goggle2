@@ -133,17 +133,25 @@ static void mplayer_create_slider(lv_obj_t *parent, int16_t x, int16_t y) {
 
 static void init_mplayer() {
     int16_t x, y;
+    // MPLAYER_SCR_* are 1920x1080 and the player used to be entered only with
+    // the display already there. It can now be entered at 720p, so read what
+    // the display actually is: at 1080p this is the same two numbers, and at
+    // 720p it is what keeps the controls on the screen instead of 200px below
+    // the bottom of it.
+    lv_coord_t scr_w = lv_disp_get_hor_res(NULL);
+    lv_coord_t scr_h = lv_disp_get_ver_res(NULL);
+
     // Background
     controller.bg = lv_obj_create(lv_scr_act());
     lv_obj_clear_flag(controller.bg, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(controller.bg, MPLAYER_SCR_WIDTH, MPLAYER_SCR_HEIGHT);
+    lv_obj_set_size(controller.bg, scr_w, scr_h);
     lv_obj_set_pos(controller.bg, 0, 0);
 
     // Controller
     controller.bar = lv_obj_create(lv_scr_act());
     lv_obj_clear_flag(controller.bar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(controller.bar, MPLAYER_CB_WIDTH, MPLAYER_CB_HEIGHT);
-    lv_obj_set_pos(controller.bar, (MPLAYER_SCR_WIDTH - MPLAYER_CB_WIDTH) >> 1, MPLAYER_SCR_HEIGHT - 160);
+    lv_obj_set_pos(controller.bar, (scr_w - MPLAYER_CB_WIDTH) >> 1, scr_h - 160);
 
     // Buttons
     x = MPLAYER_BTN_GAP;
