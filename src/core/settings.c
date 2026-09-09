@@ -10,6 +10,7 @@
 
 #include "core/self_test.h"
 #include "lang/language.h"
+#include "driver/dm6302.h"
 #include "ui/page_common.h"
 #include "ui/page_scannow.h"
 #include "util/filesystem.h"
@@ -288,7 +289,14 @@ const setting_t g_setting_defaults = {
     },
 };
 
-static void settings_load_favorites(setting_favorites_list_t *list, const setting_favorites_list_t *defaults, const char *section) {
+// channel_max is the width of the name table channel2str() indexes for this
+// list, not what the current band happens to offer: a slot registered on
+// Raceband is still a legal 12 while Lowband is selected, and slot_usable()
+// is what decides whether it can be tuned to. Anything past the table is a
+// hand-edited setting.ini, and channel2str() indexes straight into the table,
+// so it has to be turned into an empty slot here rather than trusted.
+static void settings_load_favorites(setting_favorites_list_t *list, const setting_favorites_list_t *defaults,
+                                    const char *section, uint8_t channel_max) {
     list->enable = settings_get_bool((char *)section, "enable", defaults->enable);
 
     list->count = ini_getl(section, "count", defaults->count, SETTING_INI);
@@ -297,8 +305,18 @@ static void settings_load_favorites(setting_favorites_list_t *list, const settin
 
     for (int i = 0; i < FAVORITES_MAX; i++) {
         char key[8];
+        long ch;
+
         snprintf(key, sizeof(key), "ch%d", i + 1);
-        list->channel[i] = ini_getl(section, key, defaults->channel[i], SETTING_INI);
+        ch = ini_getl(section, key, defaults->channel[i], SETTING_INI);
+
+        // 0 is the empty slot and is always legal.
+        if ((ch < 0) || (ch > channel_max)) {
+            LOGW("%s: %s=%ld is out of range, slot left empty", section, key, ch);
+            ch = 0;
+        }
+
+        list->channel[i] = (uint8_t)ch;
     }
 }
 
@@ -419,15 +437,22 @@ void settings_load(void) {
     if (g_setting.scan.channel > HDZERO_CHANNEL_NUM) {
         g_setting.scan.channel = 1;
     }
-    if (g_setting.source.analog_channel > ANALOG_CHANNEL_NUM) {
-        g_setting.scan.channel = 33;
+    // This clamped scan.channel, which belongs to HDZero and had just been
+    // checked against its own limit two lines up; the analog channel it was
+    // meant to fix went through unchecked and straight into the 48 entry name
+    // table. Zero is out of range too: channel2str() indexes channel - 1.
+    if ((g_setting.source.analog_channel < 1) ||
+        (g_setting.source.analog_channel > ANALOG_CHANNEL_NUM)) {
+        g_setting.source.analog_channel = g_setting_defaults.source.analog_channel;
     }
 
     // favorites
     // The HDZero list keeps the original [favorites] section so lists
     // registered before analog support survive the upgrade.
-    settings_load_favorites(&g_setting.favorites.hdzero, &g_setting_defaults.favorites.hdzero, FAVORITES_INI_HDZERO);
-    settings_load_favorites(&g_setting.favorites.analog, &g_setting_defaults.favorites.analog, FAVORITES_INI_ANALOG);
+    settings_load_favorites(&g_setting.favorites.hdzero, &g_setting_defaults.favorites.hdzero,
+                            FAVORITES_INI_HDZERO, BASE_CH_NUM);
+    settings_load_favorites(&g_setting.favorites.analog, &g_setting_defaults.favorites.analog,
+                            FAVORITES_INI_ANALOG, ANALOG_CHANNEL_NUM);
 
     // autoscan
     g_setting.autoscan.status = ini_getl("autoscan", "status", g_setting_defaults.autoscan.status, SETTING_INI);

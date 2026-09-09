@@ -355,7 +355,15 @@ char *channel2str(uint8_t is_hdzero, uint8_t is_lowband, uint8_t channel) // cha
         else
             return hdzero_channel_name[is_lowband][0];
     } else {
-        return analog_channel_name[channel - 1];
+        // The HDZero side has always been bounds checked and the analog side
+        // never was, so a channel out of range walked off the end of the table
+        // and handed lv_label_set_text() whatever was there. Settings are
+        // clamped on load now, but this is the array being indexed, so it
+        // answers for itself.
+        if ((channel > 0) && (channel <= ANALOG_CHANNEL_NUM))
+            return analog_channel_name[channel - 1];
+        else
+            return analog_channel_name[0];
     }
 }
 
