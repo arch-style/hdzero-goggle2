@@ -347,6 +347,18 @@ typedef struct {
     // status to /tmp/record.dat after it has closed the file, which is the
     // same guarantee the sleep was buying; the two seconds stay as the cap.
     bool dvr_stop_wait;
+    // The same for the start. dvr_cmd(DVR_START) holds dvr_mutex across its
+    // sleep, and the switch path wants that mutex for dvr_update_vi_conf(),
+    // so the auto start that follows a signal on the peripheral thread can
+    // stall the menu switch as well as itself.
+    bool dvr_start_wait;
+    // Ask for the menu's 1080p50 timing at the top of the switch to the menu
+    // instead of in the middle of Display_UI(), so the recorder stop, the
+    // audio mute and the live stop run beside dispw rather than in front of
+    // it. Display_UI() collects the timing where it would have started it.
+    // The panel blanks at the button press rather than after the recorder
+    // has stopped.
+    bool menu_async_display;
 } setting_speed_t;
 
 typedef struct {

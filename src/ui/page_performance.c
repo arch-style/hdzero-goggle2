@@ -18,6 +18,8 @@ enum {
     ROW_KEEP_DISPLAY,
     ROW_SKIP_AUDIO,
     ROW_DVR_STOP_WAIT,
+    ROW_DVR_START_WAIT,
+    ROW_MENU_ASYNC_DISPLAY,
     ROW_HEAD_TUNER,
     ROW_SPI_BURST,
     ROW_FAST_EFUSE,
@@ -56,6 +58,8 @@ enum {
 #define SAVING_KEEP_DISPLAY   "-1100ms x2"
 #define SAVING_SKIP_AUDIO     "-460ms switch"
 #define SAVING_DVR_STOP_WAIT  "2000ms > actual"
+#define SAVING_DVR_START_WAIT "2000ms > actual"
+#define SAVING_MENU_ASYNC_DSP "beside dispw"
 #define SAVING_BOOT_DISPLAY   "-1140ms"
 #define SAVING_BOOT_FONTS     "-550..-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
@@ -126,6 +130,8 @@ static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
 static btn_group_t btn_group_audio;
 static btn_group_t btn_group_dvr_stop_wait;
+static btn_group_t btn_group_dvr_start_wait;
+static btn_group_t btn_group_menu_async_display;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
@@ -293,6 +299,12 @@ static const char *perf_comment_text(int row) {
     case ROW_DVR_STOP_WAIT:
         return _lang("Only while recording, which auto record makes any time there is video.");
 
+    case ROW_DVR_START_WAIT:
+        return _lang("The auto start holds the same lock the switch wants, so this shortens both.");
+
+    case ROW_MENU_ASYNC_DISPLAY:
+        return _lang("The recorder and audio stop run beside dispw. The video goes at the press, not after.");
+
     case ROW_ANTIALIAS_OFF:
         return _lang("Only while the menu is scaled. Restored when it closes.");
 
@@ -405,6 +417,10 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
     create_toggle(&btn_group_dvr_stop_wait, cont, "Poll DVR Stop",
                   g_setting.speed.dvr_stop_wait, SAVING_DVR_STOP_WAIT, ROW_DVR_STOP_WAIT);
+    create_toggle(&btn_group_dvr_start_wait, cont, "Poll DVR Start",
+                  g_setting.speed.dvr_start_wait, SAVING_DVR_START_WAIT, ROW_DVR_START_WAIT);
+    create_toggle(&btn_group_menu_async_display, cont, "Async Menu Display",
+                  g_setting.speed.menu_async_display, SAVING_MENU_ASYNC_DSP, ROW_MENU_ASYNC_DISPLAY);
 
     // All three are DM6302_init(): two make it shorter, the third moves it off
     // the start-up path. Split between the switch and the boot sections they
@@ -589,6 +605,14 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_DVR_STOP_WAIT:
         toggle_setting(&btn_group_dvr_stop_wait, &g_setting.speed.dvr_stop_wait, "dvr_stop_wait");
+        break;
+
+    case ROW_DVR_START_WAIT:
+        toggle_setting(&btn_group_dvr_start_wait, &g_setting.speed.dvr_start_wait, "dvr_start_wait");
+        break;
+
+    case ROW_MENU_ASYNC_DISPLAY:
+        toggle_setting(&btn_group_menu_async_display, &g_setting.speed.menu_async_display, "menu_async_display");
         break;
 
     case ROW_BOOT_DISPLAY:

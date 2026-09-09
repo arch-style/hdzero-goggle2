@@ -29,10 +29,10 @@ static pthread_mutex_t dvr_mutex;
 // 5=SD card Full,6=Encoder error
 #define DVR_STATUS_RECORDING 1
 
-// The flat two seconds dvr_wait_stopped() replaces. Kept as the cap, so a
-// record process that never answers costs exactly what it used to, no more.
-#define DVR_STOP_WAIT_MS 2000
-#define DVR_STOP_POLL_MS 20
+// The flat two seconds the waits below replace. Kept as the cap, so a record
+// process that never answers costs exactly what it used to, no more.
+#define DVR_WAIT_MS 2000
+#define DVR_POLL_MS 20
 
 static int dvr_read_status(void) {
     int status = -1;
@@ -324,14 +324,41 @@ static void dvr_wait_stopped(void) {
 
     t0 = time_ms();
 
-    while (time_ms() - t0 < DVR_STOP_WAIT_MS) {
+    while (time_ms() - t0 < DVR_WAIT_MS) {
         if (dvr_read_status() != DVR_STATUS_RECORDING)
             break;
 
-        usleep(DVR_STOP_POLL_MS * 1000);
+        usleep(DVR_POLL_MS * 1000);
     }
 
     LOGI("dvr: record stop took %ums", time_ms() - t0);
+}
+
+// The mirror of it: record_saveStatus(REC_statusRun) runs once the encoder is
+// going and the file is open, so that is what a start is waiting for.
+//
+// was_running is the status from before the start command went out, and it
+// should be anything but "recording". If it already said "recording" the file
+// is stale -- an earlier run that never wrote its stop -- and polling for a
+// value that is already there would return at once, so the flat wait stands.
+static void dvr_wait_started(bool was_running) {
+    uint32_t t0;
+
+    if (!g_setting.speed.dvr_start_wait || was_running) {
+        sleep(2); // wait for record process
+        return;
+    }
+
+    t0 = time_ms();
+
+    while (time_ms() - t0 < DVR_WAIT_MS) {
+        if (dvr_read_status() == DVR_STATUS_RECORDING)
+            break;
+
+        usleep(DVR_POLL_MS * 1000);
+    }
+
+    LOGI("dvr: record start took %ums", time_ms() - t0);
 }
 
 void dvr_cmd(osd_dvr_cmd_t cmd) {
@@ -358,12 +385,21 @@ void dvr_cmd(osd_dvr_cmd_t cmd) {
 
     if (start_rec) {
         if (!dvr_is_recording && !sdcard_is_full()) {
+            // Read before the command goes out, so the wait can tell a fresh
+            // "recording" from one left behind by an earlier run. Not read at
+            // all with the poll off, so that path is the original one exactly.
+            bool was_running = g_setting.speed.dvr_start_wait &&
+                               dvr_read_status() == DVR_STATUS_RECORDING;
+
             dvr_update_record_conf();
             dvr_is_recording = true;
             usleep(100 * 1000);
             system_script(REC_START);
             dvr_recording_start = time(NULL);
-            sleep(2); // wait for record process
+            // Held under dvr_mutex, which dvr_update_vi_conf() on the switch
+            // path also wants, so this blocks the menu switch as well as the
+            // thread it runs on.
+            dvr_wait_started(was_running);
         }
     } else {
         if (dvr_is_recording) {

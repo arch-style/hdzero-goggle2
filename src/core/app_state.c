@@ -33,6 +33,15 @@ void app_state_push(app_state_t state) {
     g_app_state = state;
 }
 
+// The part of the menu switch that is about recording and audio rather than
+// the picture: independent of the display timing, so it can run either side
+// of the wait for it. The mirror of hdzero_recording_side() below.
+static void menu_recording_side(void) {
+    dvr_enable_line_out(false);
+    LOGI("switch mark: sources off");
+    system_script(REC_STOP_LIVE);
+}
+
 void app_switch_to_menu() {
     if (g_app_state == APP_STATE_IMS) {
         ims_save();
@@ -42,11 +51,6 @@ void app_switch_to_menu() {
     app_state_push(APP_STATE_MAINMENU);
     LOGI("switch mark: to_menu start");
 
-    // Stop recording if switching to menu mode from video mode regardless
-    dvr_cmd(DVR_STOP);
-    dvr_update_vi_conf(VR_1080P30);
-    LOGI("switch mark: dvr stopped");
-
     // Switching the display source to UI on its own is what forces the 1080p50
     // rebuild, and leaving the panel on the video timing while doing it tore
     // the picture into stripes. So with keep_display do not switch the source
@@ -54,6 +58,32 @@ void app_switch_to_menu() {
     // exactly as it does for the OSD, and let the menu draw into that layer.
     // The menu is laid out for 1080p, so at 720p it is cropped.
     bool overlay = g_setting.speed.keep_display && vdpo_timing_applied();
+
+    // The menu is 1080p50 whatever the video was, so unlike the video
+    // direction there is nothing to work out: the timing can be asked for
+    // before anything else here. Display_UI() collects it further down, where
+    // it would otherwise have started it, and everything between the two runs
+    // beside dispw instead of in front of it. The panel blanks here rather
+    // than at Display_UI(), so the video goes at the button press.
+    if (!overlay && g_setting.speed.menu_async_display)
+        vdpo_start_timing_async(VDPO_TMG_1080P50, "1080p50");
+
+    // Stop recording if switching to menu mode from video mode regardless
+    dvr_cmd(DVR_STOP);
+    dvr_update_vi_conf(VR_1080P30);
+    LOGI("switch mark: dvr stopped");
+
+    // Same liveness test as the video direction, and for the same reason:
+    // vdpo_timing_pending() stays true until the join, so testing that would
+    // put this in front of the menu on the runs where dispw had already
+    // finished, which is exactly what it is here to avoid.
+    bool side_done = false;
+
+    if (!overlay && g_setting.speed.menu_async_display && vdpo_timing_running()) {
+        LOGI("switch mark: audio and live stop while the display changes");
+        menu_recording_side();
+        side_done = true;
+    }
 
     if (!overlay) {
         Display_UI();
@@ -84,10 +114,8 @@ void app_switch_to_menu() {
     if (!overlay) // the picture underneath has to keep its source powered
         Analog_Module_Power(0, 0);
 
-    dvr_enable_line_out(false);
-    LOGI("switch mark: sources off");
-
-    system_script(REC_STOP_LIVE);
+    if (!side_done)
+        menu_recording_side();
     LOGI("switch mark: to_menu done");
 }
 
