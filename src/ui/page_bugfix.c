@@ -10,8 +10,9 @@
 #include "ui/ui_style.h"
 
 // Fixes for faults in the stock firmware, each one off by default so that all
-// off is the behaviour the goggles shipped with. Separate from Performance:
-// nothing here trades one thing for another, it is only about being correct.
+// off is the behaviour the goggles shipped with. Separate from the two speed
+// pages: nothing here trades one thing for another, it is only about being
+// correct, so it does not belong in a column of measured savings.
 
 enum {
     ROW_RETRY_TUNER = 0,
@@ -37,7 +38,7 @@ static lv_obj_t *page_bugfix_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1053, 894);
 
-    snprintf(buf, sizeof(buf), "%s:", _lang("Bug Fix"));
+    snprintf(buf, sizeof(buf), "%s:", _lang("Fixes"));
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
@@ -94,7 +95,7 @@ page_pack_t pp_bugfix = {
         .cur = 0,
         .max = ROW_COUNT,
     },
-    .name = "Bug Fix",
+    .name = "Fixes",
     .create = page_bugfix_create,
     .enter = NULL,
     .exit = NULL,
