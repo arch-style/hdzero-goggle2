@@ -15,6 +15,7 @@
 #include "ui/page_common.h"
 #include "util/sdcard.h"
 #include "util/system.h"
+#include "util/time.h"
 
 bool dvr_is_recording = false;
 
@@ -22,19 +23,36 @@ static time_t dvr_recording_start = 0;
 static pthread_mutex_t dvr_mutex;
 
 ///////////////////////////////////////////////////////////////////
+// The record process's own status, as it writes it to REC_dataFILE:
 //-1=error;
 // 0=idle,1=recording,2=stopped,3=No SD card,4=recorf file path error,
 // 5=SD card Full,6=Encoder error
+#define DVR_STATUS_RECORDING 1
+
+// The flat two seconds dvr_wait_stopped() replaces. Kept as the cap, so a
+// record process that never answers costs exactly what it used to, no more.
+#define DVR_STOP_WAIT_MS 2000
+#define DVR_STOP_POLL_MS 20
+
+static int dvr_read_status(void) {
+    int status = -1;
+    FILE *fp = fopen(REC_dataFILE, "r");
+
+    if (!fp)
+        return -1;
+
+    if (fscanf(fp, "%d", &status) != 1)
+        status = -1;
+
+    fclose(fp);
+
+    return status;
+}
+
 void dvr_update_status() {
     pthread_mutex_lock(&dvr_mutex);
     if (dvr_is_recording) {
-        int ret = -1;
-        FILE *fp = fopen("/tmp/record.dat", "r");
-        if (fp) {
-            fscanf(fp, "%d", &ret);
-            fclose(fp);
-        }
-        if (ret != 1) {
+        if (dvr_read_status() != DVR_STATUS_RECORDING) {
             dvr_is_recording = false;
             system_script(REC_STOP);
             sleep(2); // wait for record process
@@ -286,6 +304,36 @@ static void dvr_update_record_conf() {
     ini_putl("record", "naming", g_setting.record.naming, REC_CONF);
 }
 
+// gogglecmd only asks the record process to stop; the file is still open when
+// it returns, which is what the sleep was covering. But the record process
+// writes its status after ffpack_close(), so the file says when the close is
+// actually done and there is no reason to pay the worst case every time.
+//
+// Anything that is not "recording" ends the wait, an unreadable file
+// included: none of those can mean a recording is still open. The status can
+// only be stale if a stop follows a start too closely for the record process
+// to have written "recording" yet, and the start path still sleeps its two
+// seconds, so that cannot happen from here.
+static void dvr_wait_stopped(void) {
+    uint32_t t0;
+
+    if (!g_setting.speed.dvr_stop_wait) {
+        sleep(2); // wait for record process
+        return;
+    }
+
+    t0 = time_ms();
+
+    while (time_ms() - t0 < DVR_STOP_WAIT_MS) {
+        if (dvr_read_status() != DVR_STATUS_RECORDING)
+            break;
+
+        usleep(DVR_STOP_POLL_MS * 1000);
+    }
+
+    LOGI("dvr: record stop took %ums", time_ms() - t0);
+}
+
 void dvr_cmd(osd_dvr_cmd_t cmd) {
     LOGI("dvr_cmd: sdcard=%d, recording=%d, cmd=%d", g_sdcard_enable, dvr_is_recording, cmd);
 
@@ -321,7 +369,9 @@ void dvr_cmd(osd_dvr_cmd_t cmd) {
         if (dvr_is_recording) {
             dvr_is_recording = false;
             system_script(REC_STOP);
-            sleep(2); // wait for record process
+            // On the menu switch this runs with lvgl_mutex held, so whatever
+            // it costs is time the menu is not drawn.
+            dvr_wait_stopped();
         }
     }
 

@@ -17,6 +17,7 @@ enum {
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
     ROW_SKIP_AUDIO,
+    ROW_DVR_STOP_WAIT,
     ROW_HEAD_TUNER,
     ROW_SPI_BURST,
     ROW_FAST_EFUSE,
@@ -54,6 +55,7 @@ enum {
 #define SAVING_FAST_MENU      "-2300ms"
 #define SAVING_KEEP_DISPLAY   "-1100ms x2"
 #define SAVING_SKIP_AUDIO     "-460ms switch"
+#define SAVING_DVR_STOP_WAIT  "2000ms > actual"
 #define SAVING_BOOT_DISPLAY   "-1140ms"
 #define SAVING_BOOT_FONTS     "-550..-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
@@ -123,6 +125,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
 static btn_group_t btn_group_audio;
+static btn_group_t btn_group_dvr_stop_wait;
 static btn_group_t btn_group_boot_display;
 static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
@@ -287,6 +290,9 @@ static const char *perf_comment_text(int row) {
     case ROW_SKIP_AUDIO:
         return _lang("No effect on sound. From the second switch onward, so not at start-up.");
 
+    case ROW_DVR_STOP_WAIT:
+        return _lang("Only while recording, which auto record makes any time there is video.");
+
     case ROW_ANTIALIAS_OFF:
         return _lang("Only while the menu is scaled. Restored when it closes.");
 
@@ -397,6 +403,8 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
+    create_toggle(&btn_group_dvr_stop_wait, cont, "Poll DVR Stop",
+                  g_setting.speed.dvr_stop_wait, SAVING_DVR_STOP_WAIT, ROW_DVR_STOP_WAIT);
 
     // All three are DM6302_init(): two make it shorter, the third moves it off
     // the start-up path. Split between the switch and the boot sections they
@@ -577,6 +585,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_SKIP_AUDIO:
         toggle_setting(&btn_group_audio, &g_setting.speed.skip_audio, "skip_audio");
+        break;
+
+    case ROW_DVR_STOP_WAIT:
+        toggle_setting(&btn_group_dvr_stop_wait, &g_setting.speed.dvr_stop_wait, "dvr_stop_wait");
         break;
 
     case ROW_BOOT_DISPLAY:

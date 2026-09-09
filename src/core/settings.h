@@ -340,6 +340,13 @@ typedef struct {
     // Both paths log a fingerprint of what they read, so the fast one can be
     // checked against the slow one: same number, same calibration.
     bool fast_efuse;
+    // Wait for the record process to actually finish stopping instead of
+    // sleeping a flat two seconds. dvr_cmd(DVR_STOP) runs on the menu switch
+    // with lvgl_mutex held, so nothing is drawn for those two seconds and the
+    // menu appears that much after the button. The record process writes its
+    // status to /tmp/record.dat after it has closed the file, which is the
+    // same guarantee the sleep was buying; the two seconds stay as the cap.
+    bool dvr_stop_wait;
 } setting_speed_t;
 
 typedef struct {
