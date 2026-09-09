@@ -63,6 +63,7 @@ static const action_t btnActions[] = {
     {.id = 8, .name = "Toggle source", .functionPtr = &source_toggle},
     {.id = 9, .name = "Cycle source", .functionPtr = &source_cycle},
     {.id = 11, .name = "Next channel", .functionPtr = &tune_channel_next},
+    {.id = 13, .name = "Previous channel", .functionPtr = &tune_channel_prev},
     {.id = 12, .name = "HDZero Wide/Narrow", .functionPtr = &source_toggle_hdzero_bw},
 };
 

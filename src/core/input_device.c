@@ -216,12 +216,17 @@ void tune_channel_confirm() {
 }
 
 // A button doing in one press what the dial does with a turn and a click:
-// step to the next channel and tune to it straight away. It goes through
+// step one channel and tune to it straight away. They go through
 // tune_channel(), so the favourites list, the band limits and the channel OSD
 // are the dial's, and so is the no_dial lock -- with channel changes turned
-// off in video mode, this button is off too.
+// off in video mode, these buttons are off too.
 void tune_channel_next() {
     tune_channel(DIAL_KEY_UP);
+    tune_channel(DIAL_KEY_CLICK);
+}
+
+void tune_channel_prev() {
+    tune_channel(DIAL_KEY_DOWN);
     tune_channel(DIAL_KEY_CLICK);
 }
 

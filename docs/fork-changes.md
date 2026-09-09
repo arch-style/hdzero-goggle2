@@ -85,19 +85,20 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 ### Input — ボタンに割り当てる動作 (純正ページへの追加)
 
 `Input` ページは純正のもので、ダイヤル / 左ボタン (短押し・長押し) /
-右ボタン (短押し・長押し・ダブル) にそれぞれ動作を割り当てる。ここに 2 つ足した。
+右ボタン (短押し・長押し・ダブル) にそれぞれ動作を割り当てる。ここに 3 つ足した。
 
 | 選択肢 | 内容 |
 |---|---|
 | Next channel | 次のチャンネルへ即座に選局する。ダイヤルを 1 つ回して押す操作と同じことを 1 押しで行う |
+| Previous channel | 同じく 1 つ前のチャンネルへ |
 | HDZero Wide/Narrow | HDZero の帯域幅 Wide / Narrow を切り替える (`Source` ページの HDZero BW と同じ設定) |
 
 補足:
 
 - **アナログ / デジタルの切り替えは純正に既にある** — `Toggle source` が
   HDZero ⇔ アナログを往復する (HDMI In / AV In からは HDZero に戻る)
-- `Next channel` は選局処理そのものを呼ぶので、Favorites CH の登録があれば
-  その 8 つを巡回し、band の上限で 1 に戻り、チャンネル OSD も出る。
+- `Next channel` / `Previous channel` は選局処理そのものを呼ぶので、Favorites CH の登録があれば
+  その 8 つを巡回し、band の端では反対側へ回り込み、チャンネル OSD も出る。
   SD カードの `no_dial.txt` で映像中の選局を止めているときは、このボタンも効かない
 - `HDZero Wide/Narrow` は HDZero 視聴中なら受信機を開き直すので映像が一瞬切れる。
   他のソースを見ているときは設定を保存するだけで、次に HDZero にしたときから効く
