@@ -17,8 +17,10 @@ enum {
     ROW_FAST_MENU,
     ROW_KEEP_DISPLAY,
     ROW_SKIP_AUDIO,
+    ROW_HEAD_TUNER,
     ROW_SPI_BURST,
     ROW_FAST_EFUSE,
+    ROW_ASYNC_TUNER,
     ROW_HEAD_MENU,
     ROW_ANTIALIAS_OFF,
     ROW_HEAD_BOOT,
@@ -29,14 +31,13 @@ enum {
     ROW_ASYNC_IMU,
     ROW_ASYNC_DISPLAY,
     ROW_EARLY_TIMING,
-    ROW_ASYNC_TUNER,
     ROW_SKIP_WIFI_STOP,
     ROW_HEAD_INPUT,
-    ROW_UI_THROTTLE,
-    ROW_LABEL_DIFF,
+    ROW_STATUSBAR_IDLE,
     ROW_TIMED_LONG_PRESS,
     ROW_LONG_PRESS_MS,
     ROW_SPLIT_LOCK,
+    ROW_HEAD_SOUND,
     ROW_BUTTON_BEEP,
     ROW_DIAL_BEEP,
     ROW_BACK,
@@ -47,7 +48,9 @@ enum {
 // leaving one off is visible rather than implied.
 // Where two of these hide work in the same window they cannot both claim it,
 // so each figure is what that switch is worth ON ITS OWN and the comment
-// under the list says where it overlaps another.
+// under the list says where it overlaps another. Where one switch stops
+// another from doing anything at all the figure is replaced at runtime; see
+// row_inert() below.
 #define SAVING_FAST_MENU      "-2300ms"
 #define SAVING_KEEP_DISPLAY   "-1100ms x2"
 #define SAVING_SKIP_AUDIO     "-460ms switch"
@@ -56,12 +59,9 @@ enum {
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
 #define SAVING_ASYNC_IMU      "-686ms"
 #define SAVING_ASYNC_DISPLAY  "-1092ms alone"
-#define SAVING_UI_THROTTLE    "200Hz > 20Hz"
-#define SAVING_LABEL_DIFF     "no redraw"
+#define SAVING_STATUSBAR_IDLE "200Hz > 20Hz"
 #define SAVING_LONG_PRESS     "500ms fixed"
 #define SAVING_SPLIT_LOCK     "10 unlocks"
-#define SAVING_BUTTON_BEEP    "50 / 200ms"
-#define SAVING_DIAL_BEEP      "15ms"
 #define SAVING_ANTIALIAS      "faster redraw"
 #define SAVING_SPI_BURST      "-715ms tuner"
 #define SAVING_ASYNC_TUNER    "-844ms alone"
@@ -69,6 +69,18 @@ enum {
 #define SAVING_EARLY_TIMING   "est. -364ms"
 #define SAVING_DEFER_MENU     "est. -70..-240"
 #define SAVING_FAST_EFUSE     "est. -330ms"
+
+// The beeps are the two rows on this page that buy nothing: they are input
+// feedback that happens to be cheap. Their column says how long the beep is,
+// not what is saved, so it is worded as a duration to keep it out of the
+// column of figures above.
+#define DURATION_BUTTON_BEEP "beep 50/200ms"
+#define DURATION_DIAL_BEEP   "beep 15ms"
+
+// Shown in place of the figure when the row's switch cannot do anything in
+// the combination that is currently set. Short because the column is 180px;
+// the reason goes in the comment under the list.
+#define SAVING_INERT "(no effect)"
 
 // panel_arr_t carries MAX_PANELS of them, so this page cannot outgrow it.
 _Static_assert(ROW_COUNT <= MAX_PANELS, "Performance page has more rows than MAX_PANELS");
@@ -93,6 +105,11 @@ static lv_coord_t col_dsc[] = {90, 340, 175, 175, 180, 0, LV_GRID_TEMPLATE_LAST}
 // the rows stopped. Anything past this still scrolls.
 #define PERF_VISIBLE_H (780 - PERF_ROW_H) // one row given back to the comment
 
+// MAX_PANELS entries, not ROW_COUNT: create_select_item() places a hidden
+// selection panel on every row up to MAX_PANELS and a panel needs its track
+// to exist. The tracks past ROW_BACK cost no height -- the grid layout skips
+// hidden children and lv_obj_get_scroll_bottom() only measures visible ones --
+// so the list still ends where "Back" does.
 static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
@@ -111,13 +128,27 @@ static btn_group_t btn_group_boot_fonts;
 static btn_group_t btn_group_skip_boot_menu;
 static btn_group_t btn_group_async_imu;
 static btn_group_t btn_group_async_display;
-static btn_group_t btn_group_ui_throttle;
-static btn_group_t btn_group_label_diff;
+static btn_group_t btn_group_statusbar_idle;
 static btn_group_t btn_group_long_press;
 static btn_group_t btn_group_split_lock;
 static btn_group_t btn_group_button_beep;
 static btn_group_t btn_group_dial_beep;
+static btn_group_t btn_group_antialias;
+static btn_group_t btn_group_spi_burst;
+static btn_group_t btn_group_async_tuner;
+static btn_group_t btn_group_skip_wifi_stop;
+static btn_group_t btn_group_early_timing;
+static btn_group_t btn_group_defer_menu;
+static btn_group_t btn_group_fast_efuse;
 static slider_group_t slider_long_press;
+static lv_obj_t *perf_cont;
+static lv_obj_t *perf_comment;
+
+// Kept per row so a row can be greyed and its figure replaced after any
+// switch that changes whether it does anything.
+static lv_obj_t *row_name[ROW_COUNT];
+static lv_obj_t *row_saving[ROW_COUNT];
+static const char *row_saving_text[ROW_COUNT];
 
 // The slider carries an index into long_press_choices, and shows the value.
 static void long_press_slider_update(void) {
@@ -131,31 +162,20 @@ static void long_press_slider_update(void) {
     snprintf(buf, sizeof(buf), "%dms", long_press_choices[idx]);
     lv_label_set_text(slider_long_press.label, buf);
 }
-static btn_group_t btn_group_antialias;
-static btn_group_t btn_group_spi_burst;
-static btn_group_t btn_group_async_tuner;
-static btn_group_t btn_group_skip_wifi_stop;
-static btn_group_t btn_group_early_timing;
-static btn_group_t btn_group_defer_menu;
-static btn_group_t btn_group_fast_efuse;
-static lv_obj_t *perf_cont;
-static lv_obj_t *perf_comment;
 
 // The saving goes in the columns to the right of the Off/On buttons, which
 // create_btn_group_item() leaves free; in the row's own label the text would
 // run under the buttons.
 static void create_saving_label(lv_obj_t *cont, const char *saving, int row) {
-    create_label_item_compact(cont, saving, 4, row, 2, 60,
-                              LV_TEXT_ALIGN_LEFT, LV_GRID_ALIGN_START,
-                              &lv_font_montserrat_20);
+    row_saving[row] = create_label_item_compact(cont, saving, 4, row, 2, 60,
+                                                LV_TEXT_ALIGN_LEFT, LV_GRID_ALIGN_START,
+                                                &lv_font_montserrat_20);
+    row_saving_text[row] = saving;
 }
 
 // A group title, not a choice, so the dial passes over it.
 static void create_heading(lv_obj_t *cont, panel_arr_t *arr, const char *name, int row) {
-    char buf[64];
-
-    snprintf(buf, sizeof(buf), "%s", name);
-    lv_obj_t *label = create_label_item(cont, buf, 1, row, 3);
+    lv_obj_t *label = create_label_item(cont, _lang(name), 1, row, 3);
     lv_obj_set_style_text_color(label, lv_color_make(0xC0, 0xC0, 0x40), 0);
     lv_obj_clear_flag(arr->panel[row], FLAG_SELECTABLE);
 }
@@ -165,10 +185,94 @@ static void create_toggle(btn_group_t *group, lv_obj_t *cont, const char *name,
     create_btn_group_item(group, cont, 2, _lang(name), _lang("Off"), _lang("On"), "", "", row);
     btn_group_set_sel(group, value ? 1 : 0);
     create_saving_label(cont, saving, row);
+    row_name[row] = group->label;
+}
+
+// A switch can be on and still have nothing to do, because another switch has
+// already taken the work away or because the code behind it refuses to run
+// without its neighbours. Leaving a measured figure next to one of those
+// reads as a saving the user is not getting, so the figure is replaced and
+// the row greyed while that lasts.
+static bool row_inert(int row) {
+    switch (row) {
+    case ROW_FAST_MENU:
+        // app_enter_menu() leaves the tuner running when the menu is drawn
+        // over the video, so it never reaches the standby this row asks for
+        // and the -2300ms is already in Menu Over Video's own figure.
+        return g_setting.speed.keep_display;
+
+    case ROW_EARLY_TIMING:
+        // boot_workers_start() checks all three and logs a warning instead of
+        // starting the timing, so on its own this row does nothing at all.
+        return !(g_setting.speed.async_display && g_setting.speed.boot_display &&
+                 g_setting.speed.skip_boot_menu);
+
+    case ROW_LONG_PRESS_MS:
+        // input_device.c only reads the time on the timed path.
+        return !g_setting.speed.timed_long_press;
+
+    default:
+        return false;
+    }
+}
+
+// Only these three can go inert, so only these three are walked.
+static const int inert_rows[] = {ROW_FAST_MENU, ROW_EARLY_TIMING, ROW_LONG_PRESS_MS};
+
+static void set_row_state(lv_obj_t *obj, bool inert) {
+    if (!obj)
+        return;
+
+    if (inert)
+        lv_obj_add_state(obj, STATE_DISABLED);
+    else
+        lv_obj_clear_state(obj, STATE_DISABLED);
+}
+
+static void perf_rows_refresh(void) {
+    for (size_t i = 0; i < sizeof(inert_rows) / sizeof(inert_rows[0]); ++i) {
+        int row = inert_rows[i];
+        bool inert = row_inert(row);
+
+        set_row_state(row_name[row], inert);
+        set_row_state(row_saving[row], inert);
+
+        // The long press row has no figure to swap: its right hand column is
+        // the value itself, which still has to say what it is set to, so it
+        // is greyed rather than replaced.
+        if (row == ROW_LONG_PRESS_MS)
+            set_row_state(slider_long_press.label, inert);
+        else if (row_saving[row] && row_saving_text[row])
+            lv_label_set_text(row_saving[row], inert ? _lang(SAVING_INERT) : row_saving_text[row]);
+    }
+}
+
+// Why the selected row is doing nothing, when it is doing nothing.
+static const char *perf_inert_comment(int row) {
+    switch (row) {
+    case ROW_FAST_MENU:
+        return _lang("Nothing to do while Menu Over Video is on: the tuner is never stopped.");
+
+    case ROW_EARLY_TIMING:
+        return _lang("Does nothing until Async Display Setup, Skip Display Setup and Skip Boot Menu are all on.");
+
+    case ROW_LONG_PRESS_MS:
+        return _lang("Only used while Timed Long Press is on.");
+
+    default:
+        break;
+    }
+
+    return NULL;
 }
 
 // What the selected section is worth knowing about, shown under the list.
 static const char *perf_comment_text(int row) {
+    const char *inert = row_inert(row) ? perf_inert_comment(row) : NULL;
+
+    if (inert)
+        return inert;
+
     switch (row) {
     case ROW_FAST_MENU:
         // The first switch after start-up has nothing to hold on to yet, so
@@ -178,7 +282,7 @@ static const char *perf_comment_text(int row) {
     case ROW_KEEP_DISPLAY:
         // The video's resolution is what it is; this only stops the menu
         // overriding it, so whether the menu ends up scaled follows the source.
-        return _lang("The menu then uses the video resolution, scaled down below 1080p.");
+        return _lang("The menu then uses the video resolution, scaled down below 1080p. Keep Tuner Alive is then unnecessary.");
 
     case ROW_SKIP_AUDIO:
         return _lang("No effect on sound. From the second switch onward, so not at start-up.");
@@ -187,7 +291,7 @@ static const char *perf_comment_text(int row) {
         return _lang("Only while the menu is scaled. Restored when it closes.");
 
     case ROW_SPI_BURST:
-        return _lang("Tuner init 1663ms to 948ms. Hidden behind the display change at start-up.");
+        return _lang("Tuner init 1663ms to 948ms. Hidden behind the display change at start-up, so it shows at the switch.");
 
     case ROW_FAST_EFUSE:
         return _lang("Reads the tuner calibration once for both chips. Check the fingerprint in the log.");
@@ -217,28 +321,27 @@ static const char *perf_comment_text(int row) {
         return _lang("Runs with the tuner init. The panel blanks a little earlier.");
 
     case ROW_EARLY_TIMING:
-        return _lang("Next start-up, and only with Skip Display Setup and Skip Boot Menu on.");
+        // The three it depends on are on, or this row would be inert and
+        // perf_inert_comment() would have answered instead.
+        return _lang("Next start-up: the video timing starts before the rest of the boot path.");
 
-    case ROW_UI_THROTTLE:
-        return _lang("Status bar only. Its values are measured twice a second anyway.");
-
-    case ROW_LABEL_DIFF:
-        return _lang("Status bar only. Nothing is drawn later than before.");
+    case ROW_STATUSBAR_IDLE:
+        return _lang("Status bar only: measured 20 times a second instead of 200, and not redrawn when unchanged.");
 
     case ROW_TIMED_LONG_PRESS:
         return _lang("A long press is timed instead of counting key repeats.");
 
     case ROW_LONG_PRESS_MS:
-        return _lang("Only used while Timed Long Press is on.");
+        return _lang("How long the button is held before a long press is reported.");
 
     case ROW_SPLIT_LOCK:
         return _lang("The dial and buttons wait on the drawing loop less often.");
 
     case ROW_BUTTON_BEEP:
-        return _lang("Dial button and right button. 50ms short, 200ms long.");
+        return _lang("Dial button and right button. 50ms short, 200ms long. Not a speed setting.");
 
     case ROW_DIAL_BEEP:
-        return _lang("One 15ms beep per detent.");
+        return _lang("One 15ms beep per detent. Not a speed setting.");
 
     default:
         break;
@@ -253,7 +356,7 @@ static void perf_comment_update(void) {
 }
 
 static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
-    char buf[512];
+    char buf[64];
 
     lv_obj_t *page = lv_menu_page_create(parent, NULL);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
@@ -287,23 +390,31 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_heading(cont, arr, _lang("Menu / Video Switch"), ROW_HEAD_SWITCH);
+    create_heading(cont, arr, "Menu / Video Switch", ROW_HEAD_SWITCH);
     create_toggle(&btn_group_tuner, cont, "Keep Tuner Alive",
                   g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     create_toggle(&btn_group_overlay, cont, "Menu Over Video",
                   g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
     create_toggle(&btn_group_audio, cont, "Skip Audio Setup",
                   g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
+
+    // All three are DM6302_init(): two make it shorter, the third moves it off
+    // the start-up path. Split between the switch and the boot sections they
+    // read as unrelated, which is how one ended up being measured against the
+    // other.
+    create_heading(cont, arr, "Tuner Init", ROW_HEAD_TUNER);
     create_toggle(&btn_group_spi_burst, cont, "Burst Tuner Writes",
                   g_setting.speed.spi_burst, SAVING_SPI_BURST, ROW_SPI_BURST);
     create_toggle(&btn_group_fast_efuse, cont, "Dual-Chip EFUSE Read",
                   g_setting.speed.fast_efuse, SAVING_FAST_EFUSE, ROW_FAST_EFUSE);
+    create_toggle(&btn_group_async_tuner, cont, "Async Tuner Init",
+                  g_setting.speed.async_tuner, SAVING_ASYNC_TUNER, ROW_ASYNC_TUNER);
 
-    create_heading(cont, arr, _lang("Menu"), ROW_HEAD_MENU);
+    create_heading(cont, arr, "Menu", ROW_HEAD_MENU);
     create_toggle(&btn_group_antialias, cont, "Menu Antialias OFF",
                   g_setting.speed.menu_antialias_off, SAVING_ANTIALIAS, ROW_ANTIALIAS_OFF);
 
-    create_heading(cont, arr, _lang("Boot"), ROW_HEAD_BOOT);
+    create_heading(cont, arr, "Boot", ROW_HEAD_BOOT);
     create_toggle(&btn_group_boot_display, cont, "Skip Display Setup",
                   g_setting.speed.boot_display, SAVING_BOOT_DISPLAY, ROW_BOOT_DISPLAY);
     create_toggle(&btn_group_boot_fonts, cont, "Preload OSD Fonts",
@@ -321,20 +432,24 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_toggle(&btn_group_async_display, cont, "Async Display Setup",
                   g_setting.speed.async_display, SAVING_ASYNC_DISPLAY, ROW_ASYNC_DISPLAY);
 
+    // Directly under the last of the three it needs, so the reason it is
+    // greyed is on the screen with it.
     create_toggle(&btn_group_early_timing, cont, "Early Video Timing",
                   g_setting.speed.boot_display_early, SAVING_EARLY_TIMING, ROW_EARLY_TIMING);
-
-    create_toggle(&btn_group_async_tuner, cont, "Async Tuner Init",
-                  g_setting.speed.async_tuner, SAVING_ASYNC_TUNER, ROW_ASYNC_TUNER);
 
     create_toggle(&btn_group_skip_wifi_stop, cont, "Skip WiFi Stop",
                   g_setting.speed.skip_wifi_stop, SAVING_SKIP_WIFI_STOP, ROW_SKIP_WIFI_STOP);
 
-    create_heading(cont, arr, _lang("Input"), ROW_HEAD_INPUT);
-    create_toggle(&btn_group_ui_throttle, cont, "Throttle UI Updates",
-                  g_setting.speed.ui_throttle, SAVING_UI_THROTTLE, ROW_UI_THROTTLE);
-    create_toggle(&btn_group_label_diff, cont, "Skip Idle Redraws",
-                  g_setting.speed.label_diff, SAVING_LABEL_DIFF, ROW_LABEL_DIFF);
+    create_heading(cont, arr, "Input", ROW_HEAD_INPUT);
+    // One row for what used to be Throttle UI Updates and Skip Idle Redraws.
+    // Both act on the status bar and nothing else: the throttle cuts how often
+    // statubar_update() is called, the diff drops the redraws that are left
+    // when the text has not changed. Neither has a cost and neither is worth
+    // having without the other, so two rows only offered combinations nobody
+    // wanted.
+    create_toggle(&btn_group_statusbar_idle, cont, "Skip Idle Redraws",
+                  g_setting.speed.ui_throttle && g_setting.speed.label_diff,
+                  SAVING_STATUSBAR_IDLE, ROW_STATUSBAR_IDLE);
     create_toggle(&btn_group_long_press, cont, "Timed Long Press",
                   g_setting.speed.timed_long_press, SAVING_LONG_PRESS, ROW_TIMED_LONG_PRESS);
     create_slider_item(&slider_long_press, cont, _lang("Long Press Time"),
@@ -346,14 +461,22 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
                          LV_GRID_ALIGN_CENTER, ROW_LONG_PRESS_MS, 1);
     lv_obj_set_grid_cell(slider_long_press.label, LV_GRID_ALIGN_START, 4, 2,
                          LV_GRID_ALIGN_CENTER, ROW_LONG_PRESS_MS, 1);
+    // create_slider_item() has already given both of these a disabled colour,
+    // so perf_rows_refresh() only has to set the state.
+    row_name[ROW_LONG_PRESS_MS] = slider_long_press.name;
     long_press_slider_update();
 
     create_toggle(&btn_group_split_lock, cont, "Split UI Lock",
                   g_setting.speed.split_lock, SAVING_SPLIT_LOCK, ROW_SPLIT_LOCK);
+
+    // Not speed settings, and their column is a duration rather than a
+    // saving, so they are their own group instead of sitting at the end of a
+    // column of measured figures.
+    create_heading(cont, arr, "Sound", ROW_HEAD_SOUND);
     create_toggle(&btn_group_button_beep, cont, "Button Beep",
-                  g_setting.input.button_beep, SAVING_BUTTON_BEEP, ROW_BUTTON_BEEP);
+                  g_setting.input.button_beep, DURATION_BUTTON_BEEP, ROW_BUTTON_BEEP);
     create_toggle(&btn_group_dial_beep, cont, "Dial Beep",
-                  g_setting.input.dial_beep, SAVING_DIAL_BEEP, ROW_DIAL_BEEP);
+                  g_setting.input.dial_beep, DURATION_DIAL_BEEP, ROW_DIAL_BEEP);
 
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
@@ -369,6 +492,7 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_pad_left(perf_comment, 90, 0);
     lv_obj_set_style_pad_top(perf_comment, PERF_ROW_H, 0); // a row clear of the list
     lv_label_set_long_mode(perf_comment, LV_LABEL_LONG_WRAP);
+    perf_rows_refresh();
     perf_comment_update();
 
     return page;
@@ -384,6 +508,20 @@ static void toggle_setting_in(const char *section, btn_group_t *group, bool *val
 
 static void toggle_setting(btn_group_t *group, bool *value, const char *key) {
     toggle_setting_in("speed", group, value, key);
+}
+
+// One row, the two settings behind it. Both keys are still written so an
+// older build reading the same ini finds what it expects.
+static void toggle_statusbar_idle(void) {
+    btn_group_toggle_sel(&btn_group_statusbar_idle);
+
+    bool on = btn_group_get_sel(&btn_group_statusbar_idle) == 1;
+
+    g_setting.speed.ui_throttle = on;
+    g_setting.speed.label_diff = on;
+    settings_put_bool("speed", "ui_throttle", on);
+    settings_put_bool("speed", "label_diff", on);
+    LOGI("speed: ui_throttle=%s label_diff=%s", on ? "on" : "off", on ? "on" : "off");
 }
 
 // The framework has already moved the selection by the time this runs.
@@ -423,6 +561,7 @@ static void on_enter(void) {
     if (perf_cont)
         lv_obj_scroll_to(perf_cont, 0, 0, LV_ANIM_OFF);
 
+    perf_rows_refresh();
     perf_comment_update();
 }
 
@@ -484,12 +623,8 @@ static void on_click(uint8_t key, int sel) {
         toggle_setting(&btn_group_fast_efuse, &g_setting.speed.fast_efuse, "fast_efuse");
         break;
 
-    case ROW_UI_THROTTLE:
-        toggle_setting(&btn_group_ui_throttle, &g_setting.speed.ui_throttle, "ui_throttle");
-        break;
-
-    case ROW_LABEL_DIFF:
-        toggle_setting(&btn_group_label_diff, &g_setting.speed.label_diff, "label_diff");
+    case ROW_STATUSBAR_IDLE:
+        toggle_statusbar_idle();
         break;
 
     case ROW_TIMED_LONG_PRESS:
@@ -530,6 +665,12 @@ static void on_click(uint8_t key, int sel) {
     default:
         break;
     }
+
+    // Half a dozen of these decide whether another row does anything, and the
+    // comment under the list changes with them, so both are redone after any
+    // click rather than listing which rows affect which.
+    perf_rows_refresh();
+    perf_comment_update();
 }
 
 page_pack_t pp_performance = {
