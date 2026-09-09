@@ -10,10 +10,14 @@
 #               name, so rename it to something that says whose it is first.
 # destination   default logs/ in the checkout, which is not tracked.
 #
-# The goggles keep this boot and the nine before it (HDZGOGGLE.log, then
-# HDZGOGGLE.1.log to HDZGOGGLE.9.log, newest first). Ten boots is a lot of
-# room to notice something and go and get the card, but it is not unlimited:
-# what is on the card is a queue, and this is what takes things out of it.
+# The goggles keep the current boot as HDZGOGGLE.log and the finished ones in
+# boot-logs/, numbered upwards, up to 999 of them. That is a lot of room to
+# notice something and go and get the card, but it is still a window: the
+# oldest falls off, and this is what takes things out of the queue.
+#
+# Every candidate is read to be checksummed, so importing a card holding
+# hundreds of logs takes a moment. Ones already in the archive are then
+# skipped, so it is only ever slow, never wasteful.
 #
 # A log already in the archive is recognised by its checksum and skipped, so
 # running this on the same card twice costs nothing, and running it every time
@@ -30,21 +34,18 @@ set -e
 SRC=${1:-/Volumes/NO NAME}
 DEST=${2:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/logs}
 
+# Held in the positional parameters rather than a string, so a card mounted at
+# "/Volumes/NO NAME" survives. A glob that matches nothing stays literal and
+# fails the -s test below, which is the wanted answer either way.
 if [ -f "$SRC" ]; then
-    files=$SRC
+    set -- "$SRC"
     label=$(basename "$SRC" | sed 's/\.log$//; s/[^A-Za-z0-9._-]/_/g')-
 elif [ -d "$SRC" ]; then
-    # Newest first, which is also the order they will be read in.
-    files=$(ls "$SRC"/HDZGOGGLE.log "$SRC"/HDZGOGGLE.[0-9].log \
-               "$SRC"/HDZGOGGLE.prev.log 2>/dev/null || true)
+    set -- "$SRC/HDZGOGGLE.log" "$SRC"/boot-logs/HDZGOGGLE.*.log \
+           "$SRC/HDZGOGGLE.prev.log"
     label=
 else
     echo "no card, directory or file at $SRC" >&2
-    exit 1
-fi
-
-if [ -z "$files" ]; then
-    echo "no HDZGOGGLE logs in $SRC" >&2
     exit 1
 fi
 
@@ -52,9 +53,11 @@ mkdir -p "$DEST"
 
 saved=0
 skipped=0
+seen=0
 
-for src in $files; do
+for src do
     [ -s "$src" ] || continue
+    seen=$((seen + 1))
 
     sum=$(shasum -a 1 "$src" | cut -c1-8)
 
@@ -77,5 +80,10 @@ for src in $files; do
     echo "saved $(basename "$out")"
     echo "      $(wc -c < "$src" | tr -d ' ') bytes from $(basename "$src"), $build"
 done
+
+if [ "$seen" = 0 ]; then
+    echo "no HDZGOGGLE logs in $SRC" >&2
+    exit 1
+fi
 
 echo "$saved saved, $skipped already had"

@@ -13,8 +13,8 @@
 
 ## 全部のログ
 
-ゴーグルは 10 回分持つ (`HDZGOGGLE.log` と `HDZGOGGLE.1.log`〜`.9.log`)。それでも
-有限なので、カードを PC に挿したら
+ゴーグルは 999 回分持つ (`HDZGOGGLE.log` と `boot-logs/HDZGOGGLE.NNNN.log`)。
+それでも有限なので、カードを PC に挿したら
 
 ```sh
 utilities/save-goggle-logs.sh

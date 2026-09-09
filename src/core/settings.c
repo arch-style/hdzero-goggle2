@@ -1,8 +1,10 @@
 #include "settings.h"
 
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <log/log.h>
@@ -15,6 +17,7 @@
 #include "ui/page_scannow.h"
 #include "util/filesystem.h"
 #include "util/system.h"
+#include "util/time.h"
 
 #define SETTINGS_INI_VERSION_UNKNOWN 0
 
@@ -420,31 +423,90 @@ void settings_init(void) {
         settings_reset();
 }
 
-// The log is started fresh at every boot, so keeping the older ones is the
-// only way to compare two -- and with one kept, catching the card between the
-// boot that mattered and the next one was the whole job. Keep APP_LOG_KEEP of
-// them, oldest dropped off the end: renames on the FAT card, no copying.
-static void app_log_rotate(void) {
-    char from[64], to[64];
+// One file per finished boot in APP_LOG_DIR, numbered upwards, and the number
+// never goes back: the newest boot takes the highest number seen plus one, and
+// anything more than APP_LOG_KEEP behind it is deleted. Nothing is renamed to
+// make room, which is the point -- a scheme that shifts .1 to .2 and so on
+// costs a rename per kept boot at every start-up, and this branch exists to
+// keep things off the boot path.
+//
+// Reads the sequence number back out of the file names rather than storing it
+// anywhere. A card carrying its own history needs no state on the goggles,
+// works when the card is swapped, and cannot disagree with what is there.
+static bool app_log_seq(const char *name, unsigned *seq) {
+    char tail;
 
-    // Once, on the first boot after the two-file scheme: the file it left is
-    // the boot before the one about to become .1, and .1 is free to say so.
-    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, 1);
-    if (!fs_file_exists(to))
-        rename(APP_LOG_FILE_PREV, to);
+    // The %c is how the end of the string is checked: it must not match, so
+    // exactly one conversion is the whole name and nothing after it.
+    return sscanf(name, "HDZGOGGLE.%u.log%c", seq, &tail) == 1;
+}
 
-    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, APP_LOG_KEEP);
-    unlink(to);
+static unsigned app_log_newest(void) {
+    unsigned newest = 0, seq;
+    struct dirent *entry;
+    DIR *dir = opendir(APP_LOG_DIR);
 
-    for (int i = APP_LOG_KEEP - 1; i >= 1; i--) {
-        snprintf(from, sizeof(from), APP_LOG_FILE_OLD, i);
-        snprintf(to, sizeof(to), APP_LOG_FILE_OLD, i + 1);
-        rename(from, to); // nothing there yet is not an error
+    if (!dir)
+        return 0;
+
+    while ((entry = readdir(dir)))
+        if (app_log_seq(entry->d_name, &seq) && seq > newest)
+            newest = seq;
+
+    closedir(dir);
+    return newest;
+}
+
+// By number rather than by counting files, so a log deleted by hand leaves a
+// gap instead of keeping an older one alive. Unlinking during the walk is
+// allowed to miss an entry -- the next boot sees it again.
+static void app_log_prune(unsigned oldest_kept) {
+    char path[160];
+    unsigned seq;
+    struct dirent *entry;
+    DIR *dir = opendir(APP_LOG_DIR);
+
+    if (!dir)
+        return;
+
+    while ((entry = readdir(dir))) {
+        if (app_log_seq(entry->d_name, &seq) && seq < oldest_kept) {
+            snprintf(path, sizeof(path), APP_LOG_DIR "/%s", entry->d_name);
+            unlink(path);
+        }
     }
 
-    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, 1);
-    rename(APP_LOG_FILE, to);
+    closedir(dir);
+}
+
+static void app_log_rotate(void) {
+    uint32_t started_ms = time_ms();
+    char path[160];
+    unsigned next;
+
+    mkdir(APP_LOG_DIR, 0777);
+
+    next = app_log_newest() + 1;
+
+    if (next > APP_LOG_KEEP)
+        app_log_prune(next - APP_LOG_KEEP);
+
+    // Once, on the first boot after the two-file scheme. It is the older of
+    // the two, so it goes in first and keeps that order.
+    if (fs_file_exists(APP_LOG_FILE_PREV)) {
+        snprintf(path, sizeof(path), APP_LOG_FILE_OLD, next++);
+        rename(APP_LOG_FILE_PREV, path);
+    }
+
+    snprintf(path, sizeof(path), APP_LOG_FILE_OLD, next);
+    rename(APP_LOG_FILE, path);
     unlink(APP_LOG_FILE);
+
+    // Two directory walks on the card, and this is the boot path. Silent
+    // unless it starts to cost something worth knowing about.
+    uint32_t took_ms = time_ms() - started_ms;
+    if (took_ms >= 20)
+        LOGI("log: rotate to %u took %ums", next, took_ms);
 }
 
 void settings_load(void) {

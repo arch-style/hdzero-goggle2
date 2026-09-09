@@ -24,13 +24,16 @@
 #define NO_DIAL_FILE      "/mnt/extsd/no_dial.txt"
 #define APP_LOG_FILE      "/mnt/extsd/HDZGOGGLE.log"
 #define APP_LOG_FILE_PREV "/mnt/extsd/HDZGOGGLE.prev.log"
-// Older boots, newest first: HDZGOGGLE.1.log is the boot before this one.
-#define APP_LOG_FILE_OLD  "/mnt/extsd/HDZGOGGLE.%d.log"
-// How many of those to keep. Two -- this boot and the one before -- meant a
-// log was one power-on away from being gone, and the interesting boot is
-// always identified after the fact. Ten of them is about a megabyte. The
-// recorder writes 2.86MB a second (94.6MB for 33.1s, measured), so the whole
-// set costs a third of a second of video on a card that holds six hours.
-#define APP_LOG_KEEP      10
+// Finished boots live here, one file each, numbered upwards: the current one
+// is APP_LOG_FILE in the root, where rc.sh expects it, and everything else is
+// out of the way of the recordings.
+#define APP_LOG_DIR       "/mnt/extsd/boot-logs"
+#define APP_LOG_FILE_OLD  APP_LOG_DIR "/HDZGOGGLE.%04u.log"
+// How many boots to keep. Two -- this boot and the one before -- meant a log
+// was one power-on away from being gone, and the boot worth reading is always
+// identified after the fact. At about 100KB a boot, 999 of them is under
+// 100MB: 35 seconds of video on a card that holds six hours, at the measured
+// 2.86MB/s. The number in the name keeps climbing; only the window moves.
+#define APP_LOG_KEEP      999
 #define APP_BIN_FILE      "/mnt/extsd/HDZGOGGLE"
 #define DEVELOP_SCRIPT    "/mnt/extsd/develop.sh"
