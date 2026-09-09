@@ -12,9 +12,12 @@
 #include <sys/ioctl.h>
 #include <unistd.h> // for close
 
+#include <sys/syscall.h>
+
 #include <log/log.h>
 
 #include "../core/common.hh"
+#include "util/time.h"
 
 #define IIC_PORTS 4
 
@@ -32,10 +35,36 @@ typedef struct {
 
 static iic_lock_t g_iic_locks[IIC_PORTS];
 
+// Boots still turn up now and then where the tuner init on port 2 takes ten
+// seconds instead of two, and the log has only ever shown the waiting side:
+// "wait for the tuner bus 10080ms" says the main thread was held up and
+// nothing says by whom. Time every acquisition and, past a threshold, name
+// both the thread that waited and the one that handed the bus over. Two
+// clock_gettime() calls per transfer, both through the vDSO, and silence on a
+// boot where nothing goes wrong.
+#define I2C_WAIT_REPORT_MS 100
+
+static int g_iic_holder[IIC_PORTS];
+
+static int this_thread(void) {
+    return (int)syscall(SYS_gettid);
+}
+
 void i2c_bus_lock(int port) {
+    uint32_t t0 = time_ms();
+
     pthread_mutex_lock(&g_iic_locks[port].turnstile);
     pthread_mutex_lock(&g_iic_locks[port].bus);
     pthread_mutex_unlock(&g_iic_locks[port].turnstile);
+
+    uint32_t waited = time_ms() - t0;
+    int previous = g_iic_holder[port];
+
+    g_iic_holder[port] = this_thread();
+
+    if (waited >= I2C_WAIT_REPORT_MS)
+        LOGE("i2c: port %d, thread %d waited %ums, released by thread %d",
+             port, g_iic_holder[port], waited, previous);
 }
 
 void i2c_bus_unlock(int port) {

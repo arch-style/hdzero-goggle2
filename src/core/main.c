@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #include <log/log.h>
@@ -302,6 +303,11 @@ int main(int argc, char *argv[]) {
 
     uint32_t phase_ms = time_ms();
     uint32_t step_ms = phase_ms;
+
+    // Named so an i2c contention report can be read: everything from here to
+    // the picture, the OLED and display set-up included, is this thread.
+    LOGI("boot: main thread %d", (int)syscall(SYS_gettid));
+
     lvgl_init();
     LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
 

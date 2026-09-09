@@ -948,6 +948,7 @@ static void *hdz_async_worker(void *arg) {
     (void)arg;
 
     hdz_in_worker = true;
+    LOGI("HDZero: async open on thread %d", (int)syscall(SYS_gettid));
 
     // Behind the main thread for the CPU: the UI build is on the critical
     // path and the init mostly waits on the bus anyway. Linux applies the
