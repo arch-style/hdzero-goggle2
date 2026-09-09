@@ -174,7 +174,13 @@ void source_status_timer() {
 // deferred stop is a record process still writing.
 static void source_stop_recording(void) {
     dvr_cmd(DVR_STOP);
-    dvr_collect_stop();
+
+    // Waiting for the file to be closed is what the tail of the recording is
+    // worth, against up to two seconds of the goggles not answering the
+    // button. Only ever spent on a recording under three seconds old, so it
+    // is the user's call and off by default.
+    if (g_setting.bugfix.wait_for_recording)
+        dvr_collect_stop();
 }
 
 static void page_source_select_hdzero() {
@@ -276,8 +282,7 @@ void source_toggle_hdzero_bw() {
         // The bandwidth is set inside the tuner init, so this closes the
         // receivers for the best part of a second. A recording still being
         // finalised would take all of that.
-        dvr_cmd(DVR_STOP);
-        dvr_collect_stop();
+        source_stop_recording();
         app_switch_to_hdzero(true);
     }
 }

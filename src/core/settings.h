@@ -376,6 +376,18 @@ typedef struct {
     // receivers were fine and nothing ever tried again. On means a failed
     // init leaves the tuner closed, and the next switch initialises it.
     bool retry_tuner_init;
+    // A source change stops the recorder, which is the fix for a recording
+    // carrying on across it. The record process does not close the file when
+    // told to, though: it finalises about three seconds after the recording
+    // started, and takes frames until it does. On also waits for that, so the
+    // tail of the file cannot be the picture the switch moved away from.
+    //
+    // The wait is the remainder of those three seconds, so it is zero for
+    // anything recorded for longer -- every real flight. What it costs is up
+    // to two seconds of the goggles not answering, to protect a clip under
+    // three seconds long. Off by default for that reason: the fix that
+    // matters is the stop, and it is not optional.
+    bool wait_for_recording;
 } setting_bugfix_t;
 
 typedef struct {

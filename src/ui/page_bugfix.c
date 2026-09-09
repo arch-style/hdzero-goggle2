@@ -16,6 +16,7 @@
 
 enum {
     ROW_RETRY_TUNER = 0,
+    ROW_WAIT_RECORDING,
     ROW_BACK,
     ROW_COUNT
 };
@@ -24,6 +25,7 @@ static lv_coord_t col_dsc[] = {90, 340, 175, 175, 180, 0, LV_GRID_TEMPLATE_LAST}
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_retry_tuner;
+static btn_group_t btn_group_wait_recording;
 
 static lv_obj_t *page_bugfix_create(lv_obj_t *parent, panel_arr_t *arr) {
     char buf[512];
@@ -57,17 +59,24 @@ static lv_obj_t *page_bugfix_create(lv_obj_t *parent, panel_arr_t *arr) {
                           _lang("Off"), _lang("On"), "", "", ROW_RETRY_TUNER);
     btn_group_set_sel(&btn_group_retry_tuner, g_setting.bugfix.retry_tuner_init ? 1 : 0);
 
+    create_btn_group_item(&btn_group_wait_recording, cont, 2, _lang("Wait For Recording"),
+                          _lang("Off"), _lang("On"), "", "", ROW_WAIT_RECORDING);
+    btn_group_set_sel(&btn_group_wait_recording, g_setting.bugfix.wait_for_recording ? 1 : 0);
+
     snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
     create_label_item(cont, buf, 1, ROW_BACK, 3);
 
     pp_bugfix.p_arr.max = ROW_COUNT;
 
     lv_obj_t *note = lv_label_create(cont);
-    snprintf(buf, sizeof(buf), "%s:\n    - %s\n    - %s\n    - %s",
+    snprintf(buf, sizeof(buf), "%s:\n    - %s\n    - %s\n    - %s\n%s:\n    - %s\n    - %s",
              _lang("Retry Tuner Init"),
              _lang("The receivers sometimes fail to start: no picture, noise, or two dead antennas"),
              _lang("Stock calls the tuner open even when its init failed, so nothing ever retried"),
-             _lang("On retries immediately, then again on the next switch to video"));
+             _lang("On retries immediately, then again on the next switch to video"),
+             _lang("Wait For Recording"),
+             _lang("A source change always stops the recorder now; the file is finalised a moment later"),
+             _lang("On waits for that, up to 2s, so a clip under 3s long cannot end in the old picture"));
     lv_label_set_text(note, buf);
 
     lv_obj_set_style_text_font(note, &lv_font_montserrat_16, 0);
@@ -81,13 +90,24 @@ static lv_obj_t *page_bugfix_create(lv_obj_t *parent, panel_arr_t *arr) {
 }
 
 static void on_click(uint8_t key, int sel) {
-    if (sel != ROW_RETRY_TUNER)
-        return;
+    switch (sel) {
+    case ROW_RETRY_TUNER:
+        btn_group_toggle_sel(&btn_group_retry_tuner);
+        g_setting.bugfix.retry_tuner_init = btn_group_get_sel(&btn_group_retry_tuner) == 1;
+        settings_put_bool("bugfix", "retry_tuner_init", g_setting.bugfix.retry_tuner_init);
+        LOGI("bugfix: retry_tuner_init=%s", g_setting.bugfix.retry_tuner_init ? "on" : "off");
+        break;
 
-    btn_group_toggle_sel(&btn_group_retry_tuner);
-    g_setting.bugfix.retry_tuner_init = btn_group_get_sel(&btn_group_retry_tuner) == 1;
-    settings_put_bool("bugfix", "retry_tuner_init", g_setting.bugfix.retry_tuner_init);
-    LOGI("bugfix: retry_tuner_init=%s", g_setting.bugfix.retry_tuner_init ? "on" : "off");
+    case ROW_WAIT_RECORDING:
+        btn_group_toggle_sel(&btn_group_wait_recording);
+        g_setting.bugfix.wait_for_recording = btn_group_get_sel(&btn_group_wait_recording) == 1;
+        settings_put_bool("bugfix", "wait_for_recording", g_setting.bugfix.wait_for_recording);
+        LOGI("bugfix: wait_for_recording=%s", g_setting.bugfix.wait_for_recording ? "on" : "off");
+        break;
+
+    default:
+        break;
+    }
 }
 
 page_pack_t pp_bugfix = {
