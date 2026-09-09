@@ -23,6 +23,7 @@
 #include "core/elrs.h"
 #include "core/msp_displayport.h"
 #include "core/settings.h"
+#include "util/time.h"
 #include "driver/dm5680.h"
 #include "driver/fans.h"
 #include "driver/fbtools.h"
@@ -938,13 +939,28 @@ int osd_init(void) {
                           clock_time, sizeof(clock_time),
                           clock_format, sizeof(clock_format));
 
+    // Each step timed: this is where a ten second stall has been seen once,
+    // and 1800 lv_img objects across two sets is the kind of work that hides
+    // one. The font wait is inside the first fc_osd_init().
+    uint32_t step_ms;
+
     create_osd_scr();
 
+    step_ms = time_ms();
     fc_osd_init(0, OFFSET_X, OFFSET_Y);
-    embedded_osd_init(0);
+    LOGI("boot step: osd hd grid %ums", time_ms() - step_ms);
 
+    step_ms = time_ms();
+    embedded_osd_init(0);
+    LOGI("boot step: osd hd embedded %ums", time_ms() - step_ms);
+
+    step_ms = time_ms();
     fc_osd_init(1, OFFSET_X + (OFFSET_X >> 1), OFFSET_Y + (OFFSET_Y >> 1));
+    LOGI("boot step: osd fhd grid %ums", time_ms() - step_ms);
+
+    step_ms = time_ms();
     embedded_osd_init(1);
+    LOGI("boot step: osd fhd embedded %ums", time_ms() - step_ms);
 
     sem_init(&osd_semaphore, 0, 1);
 

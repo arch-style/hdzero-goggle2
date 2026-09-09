@@ -313,14 +313,27 @@ int main(int argc, char *argv[]) {
     LOGI("boot phase: ui %ums", time_ms() - phase_ms);
 
     // 5. Prepare Display
+    // Broken out step by step: one boot in six has spent ten seconds
+    // somewhere in here while the tuner worker was equally stuck in its own
+    // I2C, and the single phase total could not say where.
+#define BOOT_STEP(name, call)                        \
+    do {                                             \
+        step_ms = time_ms();                         \
+        call;                                        \
+        LOGI("boot step: " name " %ums",             \
+             time_ms() - step_ms);                   \
+    } while (0)
+
     phase_ms = time_ms();
-    OLED_Startup();
-    Display_UI_init();
-    OLED_Pattern(0, 0, 0);
-    osd_init();
-    ims_init();
-    ui_osd_element_pos_init();
+    BOOT_STEP("oled startup", OLED_Startup());
+    BOOT_STEP("display ui init", Display_UI_init());
+    BOOT_STEP("oled pattern", OLED_Pattern(0, 0, 0));
+    BOOT_STEP("osd init", osd_init());
+    BOOT_STEP("ims init", ims_init());
+    BOOT_STEP("osd element pos", ui_osd_element_pos_init());
     LOGI("boot phase: display and osd %ums", time_ms() - phase_ms);
+
+#undef BOOT_STEP
 
     // 6. Enable functionality
     phase_ms = time_ms();

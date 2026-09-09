@@ -16,6 +16,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "util/system.h"
+#include "util/time.h"
 
 #define WAIT(ms) usleep((ms)*1000)
 
@@ -540,9 +541,17 @@ void DM6302_M0() {
         0x32323A30,
         0x2036313A};
 
+    // Progress marks: this loop is 237 SPI writes and normally runs in about
+    // 140ms, but has once taken ten seconds while the main thread was stuck
+    // in osd_init(). The marks say whether it crawls throughout or stops dead
+    // at one point.
+    uint32_t m0_start_ms = time_ms();
+
     SPI_Write(0, 0x6, 0xFF0, 0x00000000);
     for (i = 0; i < 237; i++) {
         SPI_Write(0, 0x3, i << 2, dat[i]);
+        if ((i & 63) == 63)
+            LOGI("M0 write %u/237 at %ums", i + 1, time_ms() - m0_start_ms);
     }
 
     /*SPI_Write(0, 0x6, 0xFF0, 0x00000001);
