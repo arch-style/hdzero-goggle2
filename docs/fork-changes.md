@@ -279,15 +279,19 @@ docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src debian:bookworm-sl
 
 ### 純正との差分を見る
 
-`baseline-src/` があればそれは純正版のクローンで、比較用に置いてあるローカルの
-作業道具。**git の追跡下には無い**(175MB あり、中身は upstream から取れるものの
-重複なので、このリポジトリが運ぶものではない)。手元に無くても困らない:
+純正のクローンを別に置く必要はない。upstream をリモートに足せば済む:
 
 ```sh
 git remote add upstream https://github.com/hd-zero/hdzero-goggle2.git
 git fetch upstream
 git diff upstream/master -- src/
 ```
+
+**純正の起動時間を測り直したい場合**は `baseline-instrumentation.patch` を使う。
+純正のソースには CLOCK_MONOTONIC のアンカーが無く、`rtc_init()` が起動途中で
+時計を飛ばすので、素のままでは映像が出るまでの時間を測れない。当てる先は
+upstream の作業コピーで、このリポジトリではない(fork 側には `g_boot_start_ms` と
+`boot: picture at Nms` が既にある)。
 
 ### 実機へ
 

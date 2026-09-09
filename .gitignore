@@ -21,8 +21,3 @@ utilities/font/out
 # nix related
 result
 result-*
-
-# A clone of the same firmware kept alongside for diffing against stock. Its
-# own repository, 175MB, and reproducible from upstream, so it is not this
-# one's to carry. See docs/fork-changes.md.
-/baseline-src

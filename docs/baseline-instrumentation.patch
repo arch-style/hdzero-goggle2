@@ -1,0 +1,82 @@
+純正版(upstream v9.5.1)の起動時間を測るための計測コード。
+
+docs/measurements.md の「全 OFF 4819ms」はこれで採った。純正のソースには
+CLOCK_MONOTONIC のアンカーが無く、rtc_init() が起動途中で時計を 1970 年から
+飛ばすので、素のままでは映像が出るまでの時間を測れない。
+
+使い方: upstream v9.5.1 を別の場所にチェックアウトして当てる。
+
+    git clone https://github.com/hd-zero/hdzero-goggle2.git /tmp/stock
+    cd /tmp/stock && git checkout v9.5.1
+    git apply /path/to/this/baseline-instrumentation.patch
+
+このリポジトリのコードには当てないこと。fork 側には g_boot_start_ms と
+"boot: picture at Nms" が既にある。
+
+diff --git a/src/core/app_state.c b/src/core/app_state.c
+index 0f04112..eaa5d37 100755
+--- a/src/core/app_state.c
++++ b/src/core/app_state.c
+@@ -9,6 +9,10 @@
+ #include "core/input_device.h"
+ #include "core/msp_displayport.h"
+ #include "core/osd.h"
++
++extern uint32_t g_baseline_anchor_ms;
++uint32_t baseline_mono_ms(void);
++
+ #include "driver/dm5680.h"
+ #include "driver/dm6302.h"
+ #include "driver/hardware.h"
+@@ -221,6 +225,18 @@ void app_switch_to_hdzero(bool is_default) {
+ 
+     channel_osd_mode = CHANNEL_SHOWTIME;
+ 
++    // BASELINE MEASUREMENT ONLY. Same point the modified build reports, so
++    // the two numbers mean the same thing.
++    {
++        static bool baseline_logged = false;
++
++        if (!baseline_logged) {
++            baseline_logged = true;
++            LOGI("baseline: picture at %ums",
++                 baseline_mono_ms() - g_baseline_anchor_ms);
++        }
++    }
++
+     if (CAM_MODE == VR_1080P30 || CAM_MODE == VR_1080P24)
+         lvgl_switch_to_1080p();
+     else
+diff --git a/src/core/main.c b/src/core/main.c
+index bb6a3ca..96027d1 100644
+--- a/src/core/main.c
++++ b/src/core/main.c
+@@ -1,4 +1,5 @@
+ #include <fcntl.h>
++#include <time.h>
+ #include <pthread.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -146,7 +147,22 @@ void lvgl_init() {
+     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_make(64, 64, 64), 0);
+ }
+ 
++// BASELINE MEASUREMENT ONLY. Not part of upstream. Anchors a monotonic
++// clock at program start so app_switch_to_hdzero() can say how long the
++// first picture took. CLOCK_MONOTONIC because rtc_init() jumps the wall
++// clock from 1970 to the present partway through start-up.
++uint32_t g_baseline_anchor_ms = 0;
++
++uint32_t baseline_mono_ms(void) {
++    struct timespec ts;
++
++    clock_gettime(CLOCK_MONOTONIC, &ts);
++    return (uint32_t)((uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
++}
++
+ int main(int argc, char *argv[]) {
++    g_baseline_anchor_ms = baseline_mono_ms();
++
+     pthread_mutex_init(&lvgl_mutex, NULL);
+ 
+ #ifdef EMULATOR_BUILD
