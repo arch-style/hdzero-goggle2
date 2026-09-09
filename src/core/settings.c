@@ -138,6 +138,7 @@ const setting_t g_setting_defaults = {
     .bugfix = {
         .retry_tuner_init = false,
         .wait_for_recording = false,
+        .short_i2c_timeout = false,
     },
     .input = {
         .button_beep = false,
@@ -696,9 +697,11 @@ void settings_load(void) {
     // bug fixes
     g_setting.bugfix.retry_tuner_init = settings_get_bool("bugfix", "retry_tuner_init", g_setting_defaults.bugfix.retry_tuner_init);
     g_setting.bugfix.wait_for_recording = settings_get_bool("bugfix", "wait_for_recording", g_setting_defaults.bugfix.wait_for_recording);
-    LOGI("bugfix: retry_tuner_init=%s wait_for_recording=%s",
+    g_setting.bugfix.short_i2c_timeout = settings_get_bool("bugfix", "short_i2c_timeout", g_setting_defaults.bugfix.short_i2c_timeout);
+    LOGI("bugfix: retry_tuner_init=%s wait_for_recording=%s short_i2c_timeout=%s",
          g_setting.bugfix.retry_tuner_init ? "on" : "off",
-         g_setting.bugfix.wait_for_recording ? "on" : "off");
+         g_setting.bugfix.wait_for_recording ? "on" : "off",
+         g_setting.bugfix.short_i2c_timeout ? "on" : "off");
 
     g_setting.input.button_beep = settings_get_bool("input", "button_beep", g_setting_defaults.input.button_beep);
     g_setting.input.dial_beep = settings_get_bool("input", "dial_beep", g_setting_defaults.input.dial_beep);

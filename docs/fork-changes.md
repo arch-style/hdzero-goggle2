@@ -123,6 +123,7 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 |---|---|---|
 | Retry Tuner Init | `retry_tuner_init` | 受信機の初期化に失敗したらチューナを閉じたままにし、次の切り替えでやり直す |
 | Wait For Recording | `wait_for_recording` | ソース切替 / 帯域切替のとき、録画ファイルが閉じきるまで待つ (最大 2 秒。守れるのは 3 秒未満のクリップだけなので既定 OFF) |
+| Short I2C Timeout | `short_i2c_timeout` | メイン I2C バスのタイムアウトを 5 秒 → 500ms にする (再起動後に有効) |
 
 ---
 

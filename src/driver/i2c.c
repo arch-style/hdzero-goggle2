@@ -17,6 +17,7 @@
 #include <log/log.h>
 
 #include "../core/common.hh"
+#include "core/settings.h"
 #include "util/time.h"
 
 #define IIC_PORTS 4
@@ -49,6 +50,10 @@ static iic_lock_t g_iic_locks[IIC_PORTS];
 // held for the whole of it. The two reports together say whether a stall was
 // somebody else's turn or nobody's answer, and which chip it was.
 #define I2C_XFER_REPORT_MS 200
+
+// What the adapter's timeout is set to with the fix on. The default is five
+// seconds; the longest transaction here is a few hundred bits.
+#define I2C_TIMEOUT_MS 500
 
 static void i2c_xfer_report(int port, uint8_t slave_address, const char *what,
                             uint32_t started_ms) {
@@ -119,6 +124,12 @@ void iic_init() {
     for (int i = 1; i < IIC_PORTS; ++i) {
         g_iic_fds[i] = open(IIC_DEVS[i], O_RDONLY);
         iic_is_port_ready(i);
+
+        // In units of 10ms, and only where the adapter honours it. Settings
+        // are loaded before this runs.
+        if (g_setting.bugfix.short_i2c_timeout && g_iic_fds[i] >= 0 &&
+            ioctl(g_iic_fds[i], I2C_TIMEOUT, I2C_TIMEOUT_MS / 10) < 0)
+            LOGE("i2c: port %d would not take a %dms timeout", i, I2C_TIMEOUT_MS);
     }
 }
 

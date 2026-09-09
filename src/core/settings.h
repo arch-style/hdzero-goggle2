@@ -388,6 +388,17 @@ typedef struct {
     // three seconds long. Off by default for that reason: the fix that
     // matters is the stop, and it is not optional.
     bool wait_for_recording;
+    // A transfer on the main I2C bus has been measured taking 5006ms and then
+    // succeeding: one lost interrupt, the driver's own timeout, a controller
+    // reset, and a retry that worked. Five seconds is the kernel's default
+    // for this adapter, and the bus lock is held for all of it, so everything
+    // else on the port stops too -- seen as the goggles freezing mid-switch.
+    //
+    // On sets the adapter's timeout to 500ms. Nothing here needs anything
+    // like that long: the largest transaction is a few hundred bits, a
+    // millisecond at the slowest speed the bus runs. The recovery is the
+    // same, it just starts ten times sooner.
+    bool short_i2c_timeout;
 } setting_bugfix_t;
 
 typedef struct {

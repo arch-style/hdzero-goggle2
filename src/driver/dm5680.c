@@ -27,6 +27,7 @@
 #include "core/osd.h"
 #include "driver/uart.h"
 #include "ui/page_common.h"
+#include "util/system.h"
 
 /////////////////////////////////////////////////////////////////////
 // global
@@ -151,6 +152,7 @@ void uart_parse(uint8_t sel, uint8_t *state, uint8_t *len, uint8_t *payload, uin
 }
 
 static void *pthread_recv_dm5680l(void *arg) {
+    log_thread_id("dm5680 left uart");
     int i, len = 0;
 
     uint8_t buffer[128];
@@ -189,6 +191,9 @@ static void *pthread_recv_dm5680l(void *arg) {
 }
 
 static void *pthread_recv_dm5680r(void *arg) {
+    // Also the right button: the select() timeout branch calls rbtn_click(),
+    // so everything a right button press does runs on this thread.
+    log_thread_id("dm5680 right uart");
     int i, len = 0;
 
     uint8_t buffer[128];
