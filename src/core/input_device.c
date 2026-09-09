@@ -51,6 +51,7 @@
 #include "ui/ui_osd_element_pos.h"
 #include "ui/ui_porting.h"
 #include "util/time.h"
+#include "util/system.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Tune channel on video mode
@@ -604,6 +605,7 @@ static void add_to_epfd(int epfd, int fd) {
 }
 
 static void *thread_input_device(void *ptr) {
+    log_thread_id("input");
 #ifndef EMULATOR_BUILD
     for (;;) {
         struct epoll_event events[EPOLL_FD_CNT];

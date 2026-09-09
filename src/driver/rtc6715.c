@@ -16,6 +16,7 @@
 #include "../core/settings.h"
 #include "app_state.h"
 #include "ui/page_common.h"
+#include "util/system.h"
 
 int rtc6715_rssi = 0;
 
@@ -87,6 +88,7 @@ int RTC6715_GetRssi() {
 
 extern int GOGGLE_VER_2;
 void *thread_rtc6715_rssi(void *ptr) {
+    log_thread_id("analog rssi");
     for (;;) {
         if (GOGGLE_VER_2) {
             if (g_app_state == APP_STATE_VIDEO && g_source_info.source == SOURCE_ANALOG && g_setting.source.analog_module == SETTING_SOURCES_ANALOG_MODULE_INTERNAL) {

@@ -37,6 +37,7 @@
 #include "ui/page_scannow.h"
 #include "ui/ui_image_setting.h"
 #include "ui/ui_porting.h"
+#include "util/system.h"
 
 extern const lv_font_t conthrax_26;
 extern const lv_font_t robotomono_26;
@@ -1098,6 +1099,7 @@ static bool font_prefetch_running = false;
 static bool font_prefetch_done = false;
 
 static void *font_prefetch_worker(void *arg) {
+    log_thread_id("font preload");
     (void)arg;
 
     load_fc_osd_font(0);
@@ -1209,6 +1211,7 @@ void osd_signal_update() {
 }
 
 void *thread_osd(void *ptr) {
+    log_thread_id("osd");
     static uint8_t fhd_d = 0;
     for (;;) {
         // wait for signal to render

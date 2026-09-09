@@ -44,6 +44,20 @@ static iic_lock_t g_iic_locks[IIC_PORTS];
 // boot where nothing goes wrong.
 #define I2C_WAIT_REPORT_MS 100
 
+// And a single transfer that takes this long is not contention at all: it is
+// the kernel's own timeout on a device that never answered, with the bus lock
+// held for the whole of it. The two reports together say whether a stall was
+// somebody else's turn or nobody's answer, and which chip it was.
+#define I2C_XFER_REPORT_MS 200
+
+static void i2c_xfer_report(int port, uint8_t slave_address, const char *what,
+                            uint32_t started_ms) {
+    uint32_t took = time_ms() - started_ms;
+
+    if (took >= I2C_XFER_REPORT_MS)
+        LOGE("i2c: port %d, addr 0x%02x, %s took %ums", port, slave_address, what, took);
+}
+
 static int g_iic_holder[IIC_PORTS];
 
 static int this_thread(void) {
@@ -243,8 +257,10 @@ int i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const 
     work_queue.msgs = msgs;
 
     i2c_bus_lock(port);
+    uint32_t started_ms = time_ms();
     ret = ioctl(g_iic_fds[port], I2C_RDWR, (unsigned long)&work_queue);
     int err = errno;
+    i2c_xfer_report(port, slave_address, "burst", started_ms);
     i2c_bus_unlock(port);
 
     if (ret == count)
@@ -269,7 +285,9 @@ uint8_t i2c_read(int port, uint8_t slave_address, uint8_t addr) {
     }
 
     i2c_bus_lock(port);
+    uint32_t started_ms = time_ms();
     val = iic_read(g_iic_fds[port], slave_address, addr);
+    i2c_xfer_report(port, slave_address, "read", started_ms);
     i2c_bus_unlock(port);
 
     return val;
@@ -281,7 +299,9 @@ int8_t i2c_read_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *data, 
     }
 
     i2c_bus_lock(port);
+    uint32_t started_ms = time_ms();
     iic_read_n(g_iic_fds[port], slave_address, addr, data, len);
+    i2c_xfer_report(port, slave_address, "read n", started_ms);
     i2c_bus_unlock(port);
 
     return 0;
@@ -295,7 +315,9 @@ int i2c_write(int port, uint8_t slave_address, uint8_t addr, uint8_t val) {
     }
 
     i2c_bus_lock(port);
+    uint32_t started_ms = time_ms();
     ret = iic_write(g_iic_fds[port], slave_address, addr, val);
+    i2c_xfer_report(port, slave_address, "write", started_ms);
     i2c_bus_unlock(port);
 
     return ret;
@@ -309,7 +331,9 @@ int8_t i2c_write_n(int port, uint8_t slave_address, uint8_t addr, uint8_t *val, 
     }
 
     i2c_bus_lock(port);
+    uint32_t started_ms = time_ms();
     iic_write_n(g_iic_fds[port], slave_address, addr, val, len);
+    i2c_xfer_report(port, slave_address, "write n", started_ms);
     i2c_bus_unlock(port);
 
     return 0;

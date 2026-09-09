@@ -24,6 +24,7 @@
 #include "driver/oled.h"
 #include "ui/page_common.h"
 #include "util/math.h"
+#include "util/system.h"
 
 // #define FAST_SIM
 typedef enum {
@@ -199,6 +200,13 @@ void ht_set_imu_ready(void) {
 }
 
 static void timer_callback_imu(union sigval timer_data) {
+    static bool named = false;
+
+    if (!named) {
+        named = true;
+        log_thread_id("imu timer");
+    }
+
     if (!imu_ready)
         return;
 
@@ -387,6 +395,8 @@ void head_alarm_init() {
 }
 
 void *head_alarm_thread(void *arg) {
+    log_thread_id("head alarm");
+
     while (1) {
         bool sounding_alarm = false;
         if (ht_data.enable && (g_setting.ht.alarm_state != SETTING_HT_ALARM_STATE_OFF)) {                                                                                                             // user settings

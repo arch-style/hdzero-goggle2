@@ -1157,6 +1157,7 @@ static int get_progress_info(int *v0, int *v1) {
 }
 
 void *thread_version(void *ptr) {
+    log_thread_id("version");
     int count = 0;
     int sec = 0;
     int sec_last = 0;

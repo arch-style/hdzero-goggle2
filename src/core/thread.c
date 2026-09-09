@@ -148,6 +148,7 @@ static void check_source_signal(int vtmg_change) {
 }
 
 static void *thread_peripheral(void *ptr) {
+    log_thread_id("peripheral");
     int record_vtmg_change = 0;
     int j = 0, k = 0;
 

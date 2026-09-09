@@ -9,6 +9,15 @@
 #include "util/filesystem.h"
 #include "util/time.h"
 
+#include <sys/syscall.h>
+#include <unistd.h>
+
+#include <log/log.h>
+
+void log_thread_id(const char *name) {
+    LOGI("thread: %s is %d", name, (int)syscall(SYS_gettid));
+}
+
 // Every one of these forks a shell. On this SoC that is not free, and the
 // menu/video switch path runs several, so log how long each one took.
 //

@@ -648,6 +648,7 @@ static vdpo_tmg_t vdpo_pending_tmg;
 static char vdpo_pending_mode[16];
 
 static void *vdpo_worker(void *arg) {
+    log_thread_id("display timing");
     char buf[64];
 
     (void)arg;
@@ -948,7 +949,7 @@ static void *hdz_async_worker(void *arg) {
     (void)arg;
 
     hdz_in_worker = true;
-    LOGI("HDZero: async open on thread %d", (int)syscall(SYS_gettid));
+    log_thread_id("tuner init");
 
     // Behind the main thread for the CPU: the UI build is on the critical
     // path and the init mostly waits on the bus anyway. Linux applies the

@@ -55,10 +55,12 @@ SDL_mutex *global_sdl_mutex;
 #include "ui/ui_porting.h"
 #include "ui/ui_statusbar.h"
 #include "util/time.h"
+#include "util/system.h"
 
 int gif_cnt = 0;
 
 static void *thread_autoscan(void *ptr) {
+    log_thread_id("autoscan");
     for (;;) {
         pthread_mutex_lock(&lvgl_mutex);
         main_menu_show(true);
@@ -155,6 +157,7 @@ static bool imu_up = false;
 
 static void *imu_init_worker(void *arg) {
     (void)arg;
+    log_thread_id("imu init");
 
     imu_up = enable_bmi270();
 
@@ -348,7 +351,7 @@ int main(int argc, char *argv[]) {
 
     // Named so an i2c contention report can be read: everything from here to
     // the picture, the OLED and display set-up included, is this thread.
-    LOGI("boot: main thread %d", (int)syscall(SYS_gettid));
+    log_thread_id("main");
 
     lvgl_init();
     LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
