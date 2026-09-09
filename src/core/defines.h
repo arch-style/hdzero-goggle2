@@ -28,8 +28,9 @@
 #define APP_LOG_FILE_OLD  "/mnt/extsd/HDZGOGGLE.%d.log"
 // How many of those to keep. Two -- this boot and the one before -- meant a
 // log was one power-on away from being gone, and the interesting boot is
-// always identified after the fact. Ten of them is about a megabyte, which is
-// a second of recording on a card that holds sixteen hours.
+// always identified after the fact. Ten of them is about a megabyte. The
+// recorder writes 2.86MB a second (94.6MB for 33.1s, measured), so the whole
+// set costs a third of a second of video on a card that holds six hours.
 #define APP_LOG_KEEP      10
 #define APP_BIN_FILE      "/mnt/extsd/HDZGOGGLE"
 #define DEVELOP_SCRIPT    "/mnt/extsd/develop.sh"
