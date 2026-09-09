@@ -91,6 +91,10 @@ void HDZero_Standby();
 void HDZero_open_async_start(int bw);
 // True while that worker has not been collected yet.
 bool HDZero_open_pending(void);
+// Wait for an outstanding async tuner init to finish. For start-up code on the
+// main thread that shares the I2C bus with it and cannot run at the 1MHz the
+// init sets; see the comment on the definition.
+void HDZero_open_async_wait(void);
 
 void Source_HDMI_in();
 void Source_AV(uint8_t sel); // 0=AV in, 1=AV module

@@ -982,6 +982,7 @@ bool HDZero_open_pending(void) {
     return hdz_async_pending;
 }
 
+
 static void hdz_async_collect(void) {
     if (!hdz_async_pending || hdz_in_worker)
         return;
@@ -989,6 +990,26 @@ static void hdz_async_collect(void) {
     pthread_join(hdz_async_thread, NULL);
     hdz_async_pending = false;
     LOGI("HDZero: async open collected");
+}
+
+// DM6302_init() holds the main I2C bus at 1MHz for its whole run, and the FPGA
+// the OLED is reached through does not take 1MHz. When the two overlap, every
+// transfer on that port slows by about a thousand times and both sides crawl:
+// measured on the goggles, a boot where OLED_Startup() landed in the middle of
+// the M0 image load spent 9955ms on what is normally 94ms, while the same M0
+// load took 10147ms for its normal 92ms. Total boot 12957ms against 2400ms.
+//
+// The turnstile in i2c.c makes the two share the bus fairly, which is what
+// stops either starving -- it cannot make a transfer the FPGA will not answer
+// at that speed go faster.
+//
+// So anything on the main thread that talks to the OLED during start-up waits
+// for the worker first. Costs nothing on the boots where it has already
+// finished, which is most of them. No hardware_mutex, matching every other
+// caller of hdz_async_collect(): the worker being joined runs HDZero_open(),
+// and taking a lock it might want would be a way to wait forever.
+void HDZero_open_async_wait(void) {
+    hdz_async_collect();
 }
 
 void HDZero_open_async_start(int bw) {

@@ -325,6 +325,15 @@ int main(int argc, char *argv[]) {
     } while (0)
 
     phase_ms = time_ms();
+    // Everything below reaches the OLED through the FPGA on the main I2C bus,
+    // and Async Tuner Init has that bus at 1MHz until its init finishes -- a
+    // speed the FPGA does not answer at. Overlapping the two does not divide
+    // the bus between them, it slows every transfer on it by about a thousand
+    // times: one boot spent 9955ms in OLED_Startup() and 10147ms on the M0
+    // load that was running beside it, for work that takes 94ms and 92ms when
+    // they do not meet. Waiting is free on the boots where the worker has
+    // already finished, which is most of them.
+    BOOT_STEP("wait for the tuner bus", HDZero_open_async_wait());
     BOOT_STEP("oled startup", OLED_Startup());
     BOOT_STEP("display ui init", Display_UI_init());
     BOOT_STEP("oled pattern", OLED_Pattern(0, 0, 0));
