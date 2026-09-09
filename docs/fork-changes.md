@@ -277,6 +277,18 @@ docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src debian:bookworm-sl
 `CMakeLists.txt` は `src/ui/*.c` を configure 時にしか glob しないので、
 **ファイルを追加・削除したら `cmake` を再実行する**こと。Release は `-Werror`。
 
+### 純正との差分を見る
+
+`baseline-src/` があればそれは純正版のクローンで、比較用に置いてあるローカルの
+作業道具。**git の追跡下には無い**(175MB あり、中身は upstream から取れるものの
+重複なので、このリポジトリが運ぶものではない)。手元に無くても困らない:
+
+```sh
+git remote add upstream https://github.com/hd-zero/hdzero-goggle2.git
+git fetch upstream
+git diff upstream/master -- src/
+```
+
 ### 実機へ
 
 `out/HDZGOGGLE` を SD カードのルートへコピーし、`cmp` で照合してからアンマウント。
