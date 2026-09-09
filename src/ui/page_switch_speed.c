@@ -15,8 +15,10 @@
 
 enum {
     ROW_HEAD_SWITCH = 0,
-    ROW_FAST_MENU,
+    // Above the three rows it decides the fate of, because that is the order
+    // they are read in: this is the one that greys the others out.
     ROW_KEEP_DISPLAY,
+    ROW_FAST_MENU,
     ROW_MENU_ASYNC_DISPLAY,
     ROW_PLAYBACK_KEEP_TMG,
     ROW_SKIP_AUDIO,
@@ -243,10 +245,10 @@ static lv_obj_t *page_switch_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
     speed_page_begin(&pg, cont);
 
     speed_heading(&pg, arr, "Menu / Video Switch", ROW_HEAD_SWITCH);
-    speed_toggle(&pg, &btn_group_tuner, "Keep Tuner Alive",
-                 g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     speed_toggle(&pg, &btn_group_overlay, "Menu Over Video",
                  g_setting.speed.keep_display, SAVING_KEEP_DISPLAY, ROW_KEEP_DISPLAY);
+    speed_toggle(&pg, &btn_group_tuner, "Keep Tuner Alive",
+                 g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     speed_toggle(&pg, &btn_group_menu_async_display, "Async Menu Display",
                  g_setting.speed.menu_async_display, SAVING_MENU_ASYNC_DSP, ROW_MENU_ASYNC_DISPLAY);
     speed_toggle(&pg, &btn_group_playback_keep_tmg, "720p Playback",
