@@ -421,6 +421,13 @@ void main_menu_show(bool is_show) {
         menu_reinit();
         lv_obj_clear_flag(menu, LV_OBJ_FLAG_HIDDEN);
         statusbar_show(true); // hidden during start-up by Skip Boot Menu
+        // And so is the black screen it paints, which is a start-up measure
+        // that used to last the whole session: nothing put lvgl_init()'s grey
+        // back, so a boot-only switch went on changing what the menu looked
+        // like around its pages. Unconditional rather than gated on the
+        // switch: with it off the screen is already this colour, so setting it
+        // again costs nothing and there is no state to keep in step.
+        lv_obj_set_style_bg_color(lv_scr_act(), lv_color_make(64, 64, 64), 0);
         main_menu_apply_antialiasing();
     } else {
         lv_obj_add_flag(menu, LV_OBJ_FLAG_HIDDEN);
