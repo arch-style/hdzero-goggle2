@@ -396,6 +396,14 @@ static void main_menu_fit_display(void) {
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
 
+// Built after the OSD screen when deferred, which would leave it drawn on
+// top of the video. Put it back underneath, where creating it first would
+// have left it.
+void main_menu_move_behind_osd(void) {
+    if (menu)
+        lv_obj_move_background(menu);
+}
+
 bool main_menu_is_shown(void) {
     return !lv_obj_has_flag(menu, LV_OBJ_FLAG_HIDDEN);
 }

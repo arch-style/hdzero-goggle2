@@ -86,6 +86,13 @@ static int boot_source(void) {
     return g_setting.autoscan.source;
 }
 
+// The menu is where start-up ends only for HDZero with auto scan off; every
+// other route ends in video, and there the pages can be built afterwards.
+static bool boot_ends_in_menu(void) {
+    return boot_source() == SETTING_AUTOSCAN_SOURCE_HDZERO &&
+           g_setting.autoscan.status == SETTING_AUTOSCAN_STATUS_OFF;
+}
+
 // True when start_running() will go straight to HDZero video, which is the
 // one path that needs the tuner up as early as it can be.
 static bool boot_goes_to_hdzero_video(void) {
@@ -217,6 +224,12 @@ int main(int argc, char *argv[]) {
     vclk_phase_init();
     pclk_phase_init();
 
+    // The two font sets are about 850ms of card reads and only settings_load()
+    // has to have happened first. Started here rather than after the device
+    // bring-up they are in before anything asks, which is what stops them
+    // becoming the exposed cost when the menu build moves out of the way.
+    osd_font_prefetch_start();
+
     // 2. Initialize communications.
     rtc_init();
     iic_init();
@@ -262,19 +275,21 @@ int main(int argc, char *argv[]) {
     beep_init();
     gpadc_init();
 
-    // Reading the OSD fonts is file I/O and nothing below needs them, so let
-    // it run alongside the display and tuner bring-up rather than after it.
-    osd_font_prefetch_start();
-
     // 4. Initilize UI
+    // Building the menu pages is the largest thing between here and a
+    // picture and nothing needs them until someone opens the menu, so when
+    // start-up is heading for video they are built afterwards instead.
+    bool defer_menu = g_setting.speed.defer_menu && !boot_ends_in_menu();
+
     uint32_t phase_ms = time_ms();
     uint32_t step_ms = phase_ms;
     lvgl_init();
     LOGI("boot phase: lvgl %ums", time_ms() - step_ms);
 
     step_ms = time_ms();
-    main_menu_init();
-    LOGI("boot phase: menu pages %ums", time_ms() - step_ms);
+    if (!defer_menu)
+        main_menu_init();
+    LOGI("boot phase: menu pages %ums%s", time_ms() - step_ms, defer_menu ? " (deferred)" : "");
 
     step_ms = time_ms();
     statusbar_init();
@@ -323,6 +338,15 @@ int main(int argc, char *argv[]) {
     // way, but the panel stays dark until something does, so make sure. Costs
     // nothing when there is nothing outstanding.
     vdpo_timing_collect();
+
+    if (defer_menu) {
+        step_ms = time_ms();
+        main_menu_init();
+        // Created after the OSD screen now, so it would be drawn over the
+        // video. Put it back underneath.
+        main_menu_move_behind_osd();
+        LOGI("boot phase: menu pages after video %ums", time_ms() - step_ms);
+    }
 
     // This one is the end of the switch, not the picture. They used to be the
     // same moment; they stopped being it when the audio and DVR set-up moved

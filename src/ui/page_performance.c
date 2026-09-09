@@ -24,6 +24,7 @@ enum {
     ROW_BOOT_DISPLAY,
     ROW_BOOT_FONTS,
     ROW_SKIP_BOOT_MENU,
+    ROW_DEFER_MENU,
     ROW_ASYNC_IMU,
     ROW_ASYNC_DISPLAY,
     ROW_EARLY_TIMING,
@@ -65,6 +66,10 @@ enum {
 #define SAVING_ASYNC_TUNER    "-844ms alone"
 #define SAVING_SKIP_WIFI_STOP "-1080ms after"
 #define SAVING_EARLY_TIMING   "est. -364ms"
+#define SAVING_DEFER_MENU     "est. -70..-240"
+
+// panel_arr_t carries MAX_PANELS of them, so this page cannot outgrow it.
+_Static_assert(ROW_COUNT <= MAX_PANELS, "Performance page has more rows than MAX_PANELS");
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
 // first button's arrow at the start of column 2, so column 1 has to be wider
@@ -92,7 +97,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
-                               PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
@@ -128,6 +133,7 @@ static btn_group_t btn_group_spi_burst;
 static btn_group_t btn_group_async_tuner;
 static btn_group_t btn_group_skip_wifi_stop;
 static btn_group_t btn_group_early_timing;
+static btn_group_t btn_group_defer_menu;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
 
@@ -193,6 +199,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_SKIP_BOOT_MENU:
         return _lang("The menu is on screen during start-up until the video covers it.");
+
+    case ROW_DEFER_MENU:
+        return _lang("Moves 976ms off the path, but exposes the OSD font wait and the tuner under it.");
 
     case ROW_ASYNC_IMU:
         return _lang("Brought up alongside the rest of start-up, waited for before the threads run.");
@@ -293,6 +302,9 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_toggle(&btn_group_skip_boot_menu, cont, "Skip Boot Menu",
                   g_setting.speed.skip_boot_menu, SAVING_SKIP_BOOT_MENU, ROW_SKIP_BOOT_MENU);
+
+    create_toggle(&btn_group_defer_menu, cont, "Defer Menu Build",
+                  g_setting.speed.defer_menu, SAVING_DEFER_MENU, ROW_DEFER_MENU);
 
     create_toggle(&btn_group_async_imu, cont, "Async Motion Sensor",
                   g_setting.speed.async_imu, SAVING_ASYNC_IMU, ROW_ASYNC_IMU);
@@ -429,6 +441,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_SKIP_BOOT_MENU:
         toggle_setting(&btn_group_skip_boot_menu, &g_setting.speed.skip_boot_menu, "skip_boot_menu");
+        break;
+
+    case ROW_DEFER_MENU:
+        toggle_setting(&btn_group_defer_menu, &g_setting.speed.defer_menu, "defer_menu");
         break;
 
     case ROW_ASYNC_IMU:

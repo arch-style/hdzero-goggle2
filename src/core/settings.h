@@ -328,6 +328,12 @@ typedef struct {
     // own timing runs a second dispw) and Skip Boot Menu (the panel stays
     // dark until the video arrives instead of lighting mid-reconfiguration).
     bool boot_display_early;
+    // Build the menu pages after the video instead of before it. Nothing
+    // needs them until someone opens the menu. Worth less than the 976ms it
+    // moves, because what it exposes is the wait for the OSD fonts and then
+    // the tuner and dispw underneath; the font preload is started earlier to
+    // keep the first of those small.
+    bool defer_menu;
 } setting_speed_t;
 
 typedef struct {
