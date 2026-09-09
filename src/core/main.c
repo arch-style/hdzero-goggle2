@@ -159,6 +159,37 @@ static void *imu_init_worker(void *arg) {
 static pthread_t imu_init_thread;
 static bool imu_init_running = false;
 
+// The tuner init and dispw are the two longest things in a start-up and
+// neither is wanted before the switch, so both go on workers as early as
+// there is anything for them to talk to. Everything after this point in
+// start-up is either on another I2C bus or no bus at all.
+static void boot_workers_start(void) {
+    LOGI("hw: GOGGLE_VER_2=%d revision=%d", GOGGLE_VER_2, (int)getHwRevision());
+
+    // DM6302_init() takes the main I2C bus to 1MHz for its whole run. Of the
+    // devices on that bus the only one start-up still has to set up is
+    // TP2825, which is why it is configured before this and the HDMI chips
+    // after: IT66121 is on port 1 and IT66021 on port 3, so neither cares.
+    if (g_setting.speed.async_tuner && boot_goes_to_hdzero_video())
+        HDZero_open_async_start(g_setting.source.hdzero_bw);
+
+    // dispw touches no bus at all, only the SoC's display output, so the one
+    // thing it waits for is the panel blank at the start of
+    // vdpo_start_timing_async(). Skip Display Setup is required or
+    // Display_UI_init() runs a second dispw for the menu's own timing and the
+    // switch a third; Skip Boot Menu is required because the panel then stays
+    // dark until the video arrives rather than being lit halfway through the
+    // reconfiguration.
+    if (g_setting.speed.boot_display_early && boot_goes_to_hdzero_video()) {
+        if (g_setting.speed.async_display && g_setting.speed.boot_display &&
+            g_setting.speed.skip_boot_menu)
+            start_display_timing_early();
+        else
+            LOGW("vdpo: Early Video Timing needs Async Display Setup, "
+                 "Skip Display Setup and Skip Boot Menu; not starting early");
+    }
+}
+
 static void device_init(void) {
     self_test();
 
@@ -170,10 +201,16 @@ static void device_init(void) {
     } else {
         enable_bmi270();
     }
-    IT66021_init();
-    IT66121_init();
+
+    // On the tuner's own bus, so before the workers raise its clock.
     TP2825_Config(0, 0);
     DM5680_req_ver();
+
+    boot_workers_start();
+
+    // On ports 1 and 3, and nothing before the switch reads them.
+    IT66021_init();
+    IT66121_init();
     fans_top_setspeed(g_setting.fans.top_speed);
 }
 
@@ -220,14 +257,10 @@ int main(int argc, char *argv[]) {
     // 1. Recall configuration
     settings_init();
     settings_load();
-    language_init();
-    vclk_phase_init();
-    pclk_phase_init();
 
     // The two font sets are about 850ms of card reads and only settings_load()
-    // has to have happened first. Started here rather than after the device
-    // bring-up they are in before anything asks, which is what stops them
-    // becoming the exposed cost when the menu build moves out of the way.
+    // has to have happened first, so they start here: in before anything asks,
+    // and out of the way of the menu build they used to run alongside.
     osd_font_prefetch_start();
 
     // 2. Initialize communications.
@@ -236,38 +269,20 @@ int main(int argc, char *argv[]) {
     gpio_init();
     uart_init();
 
-    // 3. Initialize core devices.
+    // 3. Initialize core devices. device_init() puts the tuner and the
+    // display timing on workers partway through, as soon as the buses they
+    // need are up, so everything below overlaps them.
     mcp3021_init();
     input_device_init();
     hw_stat_init();
     device_init();
 
-    LOGI("hw: GOGGLE_VER_2=%d revision=%d", GOGGLE_VER_2, (int)getHwRevision());
-
-    // The tuner init is 1.1-1.8s and the UI phase below is about 1.1s. They
-    // share the main I2C bus, which is why the per-port lock is a turnstile
-    // and why the init's 1MHz applies to the display bring-up as well. After
-    // device_init() so TP2825_Config() is done before that clock goes up, and
-    // only when start-up is heading straight to HDZero video, since that is
-    // the one path that needs the tuner before the threads run.
-    if (g_setting.speed.async_tuner && boot_goes_to_hdzero_video())
-        HDZero_open_async_start(g_setting.source.hdzero_bw);
-
-    // dispw is 1.1s and, with the tuner out of the way, it is the only thing
-    // the switch still waits for. Started here it runs out during the UI
-    // build instead of after it. Skip Display Setup is required or
-    // Display_UI_init() below runs a second dispw for the menu's own timing
-    // and the switch a third; Skip Boot Menu is required because the panel
-    // then stays dark until the video arrives rather than being lit halfway
-    // through the reconfiguration.
-    if (g_setting.speed.boot_display_early && boot_goes_to_hdzero_video()) {
-        if (g_setting.speed.async_display && g_setting.speed.boot_display &&
-            g_setting.speed.skip_boot_menu)
-            start_display_timing_early();
-        else
-            LOGW("vdpo: Early Video Timing needs Async Display Setup, "
-                 "Skip Display Setup and Skip Boot Menu; not starting early");
-    }
+    // No hardware in any of these, and nothing before this point needed them,
+    // so they run after the workers are away rather than delaying them: it is
+    // a tenth of a second of file parsing and logging.
+    language_init();
+    vclk_phase_init();
+    pclk_phase_init();
 
     esp32_init();
     elrs_init();
