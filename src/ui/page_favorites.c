@@ -85,15 +85,29 @@ static void title_label_update(void) {
 
 static void slot_label_update(int slot) {
     char buf[64];
+    char off_band[32];
     setting_favorites_list_t *list = viewed_list();
     bool is_hdzero = (viewed_source == FAVORITES_SOURCE_HDZERO);
     uint8_t ch = list->channel[slot];
     const char *value;
 
-    if (ch == 0)
+    if (ch == 0) {
         value = _lang("Empty");
-    else
+    } else if (ch > favorites_channel_max_of(viewed_source)) {
+        // Registered on the other band: the low band has eight channels and
+        // the race band twelve, and a slot is kept rather than clamped when
+        // the band changes. channel2str() clamps instead, so F2 seen from the
+        // low band came out as "L1" -- a channel that exists, that the dial
+        // then skipped over. Name it from the band it belongs to and say so.
+        // Plain text, no recolour markup: the row being edited wraps the
+        // whole value in a colour of its own and the two would nest.
+        snprintf(off_band, sizeof(off_band), "%s (%s)",
+                 channel2str(is_hdzero, SETTING_SOURCES_HDZERO_BAND_RACEBAND, ch),
+                 _lang("other band"));
+        value = off_band;
+    } else {
         value = channel2str(is_hdzero, g_setting.source.hdzero_band, ch);
+    }
 
     if (editing_row == ROW_SLOT_FIRST + slot)
         snprintf(buf, sizeof(buf), "%s %d: #FFFF00 %s#", _lang("Slot"), slot + 1, value);
