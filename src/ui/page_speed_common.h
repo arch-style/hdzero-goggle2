@@ -27,6 +27,16 @@ extern "C" {
 #define SPEED_COL_DSC \
     { 90, 340, 175, 175, 180, 0, LV_GRID_TEMPLATE_LAST }
 
+// Usable height of the list container, one row given back to the comment.
+// Every one of these pages uses it, and every one of them scrolls, even the
+// ones whose rows fit: the grid puts the theme's pad_row between rows and
+// style_context does not override it, so a container sized at rows * height is
+// short by one gap per row after the first. Sizing it by that arithmetic put
+// Back off the bottom of the two pages that were not scrolling. The height is
+// measured rather than derived now, and scrolling is what covers being wrong
+// about it -- the list moves instead of losing its last row.
+#define SPEED_LIST_H(row_h) (780 - (row_h))
+
 typedef struct {
     lv_obj_t *cont;
     lv_obj_t *comment;
@@ -37,7 +47,8 @@ typedef struct {
     const char *saving_text[MAX_PANELS];
 } speed_page_t;
 
-// Call once at the top of the page's create, before any row.
+// Call once at the top of the page's create, before any row. Gives the
+// container the scrolling every one of these pages relies on.
 void speed_page_begin(speed_page_t *pg, lv_obj_t *cont);
 
 // A group title, not a choice, so the dial passes over it.

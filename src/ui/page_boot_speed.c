@@ -140,10 +140,9 @@ static lv_obj_t *page_boot_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
-    lv_obj_set_size(cont, 960, ROW_COUNT * BOOT_ROW_H);
+    lv_obj_set_size(cont, 960, SPEED_LIST_H(BOOT_ROW_H));
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_layout(cont, LV_LAYOUT_GRID);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_style(cont, &style_context, LV_PART_MAIN);
     lv_obj_set_style_pad_top(cont, 0, 0);
 
@@ -186,12 +185,16 @@ static lv_obj_t *page_boot_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
 }
 
 static void on_enter(void) {
+    if (pg.cont)
+        lv_obj_scroll_to(pg.cont, 0, 0, LV_ANIM_OFF);
+
     rows_refresh();
     comment_update();
 }
 
 static void on_roller(uint8_t key) {
     (void)key;
+    speed_scroll_to(&pg, &pp_boot_speed.p_arr);
     comment_update();
 }
 

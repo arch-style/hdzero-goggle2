@@ -22,6 +22,7 @@ enum {
     ROW_HEAD_RECORDER,
     ROW_DVR_STOP_WAIT,
     ROW_DVR_START_WAIT,
+    ROW_DVR_DEFER_STOP,
     ROW_HEAD_TUNER,
     ROW_SPI_BURST,
     ROW_FAST_EFUSE,
@@ -42,6 +43,7 @@ enum {
 #define SAVING_SKIP_AUDIO     "-460ms switch"
 #define SAVING_DVR_STOP_WAIT  "2000ms > actual"
 #define SAVING_DVR_START_WAIT "2000ms > actual"
+#define SAVING_DVR_DEFER_STOP "no wait at all"
 #define SAVING_SPI_BURST      "-715ms tuner"
 #define SAVING_FAST_EFUSE     "est. -330ms"
 #define SAVING_ANTIALIAS      "faster redraw"
@@ -51,16 +53,16 @@ enum {
 _Static_assert(ROW_COUNT <= MAX_PANELS, "Switch Speed has more rows than MAX_PANELS");
 
 // 51 rather than 60: sixteen rows plus a note is more than the stock page
-// height allows at the usual spacing. Still taller than the container, so the
-// list scrolls and the dial brings the selection into view.
-#define SW_ROW_H     51
-#define SW_VISIBLE_H (780 - SW_ROW_H) // one row given back to the comment
+// height allows at the usual spacing. Taller than the container either way, so
+// the list scrolls and the dial brings the selection into view.
+#define SW_ROW_H 51
 
 static lv_coord_t col_dsc[] = SPEED_COL_DSC;
 static lv_coord_t row_dsc[] = {SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
+                               SW_ROW_H,
                                LV_GRID_TEMPLATE_LAST};
 
 static speed_page_t pg;
@@ -71,6 +73,7 @@ static btn_group_t btn_group_menu_async_display;
 static btn_group_t btn_group_audio;
 static btn_group_t btn_group_dvr_stop_wait;
 static btn_group_t btn_group_dvr_start_wait;
+static btn_group_t btn_group_dvr_defer_stop;
 static btn_group_t btn_group_spi_burst;
 static btn_group_t btn_group_fast_efuse;
 static btn_group_t btn_group_antialias;
@@ -78,22 +81,54 @@ static btn_group_t btn_group_statusbar_idle;
 static btn_group_t btn_group_split_lock;
 
 static bool row_inert(int row) {
-    if (row != ROW_FAST_MENU)
-        return false;
+    switch (row) {
+    case ROW_FAST_MENU:
+        // app_switch_to_menu() leaves the tuner running when the menu is drawn
+        // over the video, so it never reaches the standby this row asks for
+        // and the -2300ms is already inside Menu Over Video's own figure.
+        return g_setting.speed.keep_display;
 
-    // app_switch_to_menu() leaves the tuner running when the menu is drawn over
-    // the video, so it never reaches the standby this row asks for and the
-    // -2300ms is already inside Menu Over Video's own figure.
-    return g_setting.speed.keep_display;
+    case ROW_MENU_ASYNC_DISPLAY:
+        // Same reason, one line further down: with the menu drawn over the
+        // video there is no timing change to start early, and the whole block
+        // is behind the same !overlay. The first goggle log with this on and
+        // Menu Over Video on showed the marker never once.
+        return g_setting.speed.keep_display;
+
+    case ROW_DVR_STOP_WAIT:
+        // Deferring the stop means not waiting for it here at all, so there is
+        // no wait left for this row to shorten. It still decides how the wait
+        // the start collects is spent, but that is the start's row to explain.
+        return g_setting.speed.dvr_defer_stop;
+
+    default:
+        return false;
+    }
 }
 
+static const int inert_rows[] = {ROW_FAST_MENU, ROW_MENU_ASYNC_DISPLAY, ROW_DVR_STOP_WAIT};
+
 static void rows_refresh(void) {
-    speed_row_inert(&pg, ROW_FAST_MENU, row_inert(ROW_FAST_MENU));
+    for (size_t i = 0; i < sizeof(inert_rows) / sizeof(inert_rows[0]); ++i)
+        speed_row_inert(&pg, inert_rows[i], row_inert(inert_rows[i]));
 }
 
 static const char *comment_text(int row) {
-    if (row == ROW_FAST_MENU && row_inert(row))
-        return _lang("Nothing to do while Menu Over Video is on: the tuner is never stopped.");
+    if (row_inert(row)) {
+        switch (row) {
+        case ROW_FAST_MENU:
+            return _lang("Nothing to do while Menu Over Video is on: the tuner is never stopped.");
+
+        case ROW_MENU_ASYNC_DISPLAY:
+            return _lang("Nothing to do while Menu Over Video is on: the display is not changed at all.");
+
+        case ROW_DVR_STOP_WAIT:
+            return _lang("Nothing to do while Defer DVR Stop is on: the switch does not wait for it.");
+
+        default:
+            break;
+        }
+    }
 
     switch (row) {
     case ROW_FAST_MENU:
@@ -115,6 +150,9 @@ static const char *comment_text(int row) {
 
     case ROW_DVR_START_WAIT:
         return _lang("The auto start holds the same lock the switch wants, so this shortens both.");
+
+    case ROW_DVR_DEFER_STOP:
+        return _lang("The recording is finalised about 3s after it began. This stops waiting for it here.");
 
     case ROW_SPI_BURST:
         return _lang("Tuner init 1663ms to 948ms. Hidden behind the display change at start-up, so it shows at the switch.");
@@ -176,16 +214,12 @@ static lv_obj_t *page_switch_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
     create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
-    lv_obj_set_size(cont, 960, SW_VISIBLE_H);
+    lv_obj_set_size(cont, 960, SPEED_LIST_H(SW_ROW_H));
     lv_obj_set_pos(cont, 0, 0);
     lv_obj_set_layout(cont, LV_LAYOUT_GRID);
     lv_obj_add_style(cont, &style_context, LV_PART_MAIN);
 
-    // Taller than it is, so it scrolls; on_roller keeps the selection in view.
-    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_pad_top(cont, 0, 0);
-    lv_obj_scroll_to(cont, 0, 0, LV_ANIM_OFF);
 
     lv_obj_set_style_grid_column_dsc_array(cont, col_dsc, 0);
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
@@ -208,6 +242,8 @@ static lv_obj_t *page_switch_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
                  g_setting.speed.dvr_stop_wait, SAVING_DVR_STOP_WAIT, ROW_DVR_STOP_WAIT);
     speed_toggle(&pg, &btn_group_dvr_start_wait, "Poll DVR Start",
                  g_setting.speed.dvr_start_wait, SAVING_DVR_START_WAIT, ROW_DVR_START_WAIT);
+    speed_toggle(&pg, &btn_group_dvr_defer_stop, "Defer DVR Stop",
+                 g_setting.speed.dvr_defer_stop, SAVING_DVR_DEFER_STOP, ROW_DVR_DEFER_STOP);
 
     // Async Tuner Init is the third of these and lives on Boot Speed: it only
     // moves the start-up init, where these two shorten every one.
@@ -279,6 +315,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_DVR_START_WAIT:
         speed_store(&btn_group_dvr_start_wait, &g_setting.speed.dvr_start_wait, "speed", "dvr_start_wait");
+        break;
+
+    case ROW_DVR_DEFER_STOP:
+        speed_store(&btn_group_dvr_defer_stop, &g_setting.speed.dvr_defer_stop, "speed", "dvr_defer_stop");
         break;
 
     case ROW_SPI_BURST:

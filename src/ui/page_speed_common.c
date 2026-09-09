@@ -11,6 +11,13 @@
 void speed_page_begin(speed_page_t *pg, lv_obj_t *cont) {
     memset(pg, 0, sizeof(*pg));
     pg->cont = cont;
+
+    // Taller than the container whenever the rows ask for it; speed_scroll_to()
+    // keeps the selection in view. A page whose rows fit never scrolls, and one
+    // whose rows do not keeps its last row instead of clipping it.
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_scroll_to(cont, 0, 0, LV_ANIM_OFF);
 }
 
 void speed_heading(speed_page_t *pg, panel_arr_t *arr, const char *name, int row) {
