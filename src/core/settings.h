@@ -398,7 +398,7 @@ typedef struct {
 } setting_input_t;
 
 // Offered on the settings page as a slider, longest first.
-#define LONG_PRESS_CHOICE_NUM 5
+#define LONG_PRESS_CHOICE_NUM 6
 extern const uint16_t long_press_choices[LONG_PRESS_CHOICE_NUM];
 // Position of ms in that list, or -1 if it is not one of them.
 int long_press_choice_index(uint16_t ms);

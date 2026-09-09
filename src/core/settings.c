@@ -20,7 +20,9 @@
 
 setting_t g_setting;
 
-const uint16_t long_press_choices[LONG_PRESS_CHOICE_NUM] = {500, 400, 300, 200, 100};
+// Slowest first, so an index that was saved before a value was added still
+// means the same time.
+const uint16_t long_press_choices[LONG_PRESS_CHOICE_NUM] = {500, 400, 300, 200, 100, 50};
 
 int long_press_choice_index(uint16_t ms) {
     for (int i = 0; i < LONG_PRESS_CHOICE_NUM; i++) {
