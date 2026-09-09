@@ -1,7 +1,5 @@
 #include "media.h"
 
-#include <lvgl/lvgl.h>
-
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -241,13 +239,8 @@ media_t *media_instantiate(char *filename, notify_cb_t notify) {
         vvParams.vdec.width = playCtx->dmx->width;
         vvParams.vdec.height = playCtx->dmx->height;
 
-        // VO_WIDTH/VO_HEIGHT are 1920x1080, and stDispRect is the rectangle
-        // the decoded frames are scaled into on the display surface. Played at
-        // 720p that is one and a half times the surface, which is the shear
-        // and the wrong scale seen on the goggles. The display knows its own
-        // size; at 1080p these are the same two numbers as before.
-        vvParams.vo.width = lv_disp_get_hor_res(NULL);
-        vvParams.vo.height = lv_disp_get_ver_res(NULL);
+        vvParams.vo.width = VO_WIDTH;
+        vvParams.vo.height = VO_HEIGHT;
         vvParams.vo.intfType = VO_intfTYPE;
         vvParams.vo.intfSync = VO_intfSYNC;
         vvParams.vo.uiChn = VO_uiCHN;

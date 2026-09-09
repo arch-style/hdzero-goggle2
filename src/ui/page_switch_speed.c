@@ -20,7 +20,6 @@ enum {
     ROW_KEEP_DISPLAY,
     ROW_FAST_MENU,
     ROW_MENU_ASYNC_DISPLAY,
-    ROW_PLAYBACK_KEEP_TMG,
     ROW_SKIP_AUDIO,
     ROW_HEAD_RECORDER,
     ROW_DVR_STOP_WAIT,
@@ -43,7 +42,6 @@ enum {
 #define SAVING_FAST_MENU      "-2300ms"
 #define SAVING_KEEP_DISPLAY   "-1100ms x2"
 #define SAVING_MENU_ASYNC_DSP "beside dispw"
-#define SAVING_PLAYBACK_TMG   "no dispw at all"
 #define SAVING_SKIP_AUDIO     "-460ms switch"
 #define SAVING_DVR_STOP_WAIT  "2000ms > actual"
 #define SAVING_DVR_START_WAIT "2000ms > actual"
@@ -66,7 +64,7 @@ static lv_coord_t row_dsc[] = {SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
                                SW_ROW_H, SW_ROW_H, SW_ROW_H, SW_ROW_H,
-                               SW_ROW_H, SW_ROW_H,
+                               SW_ROW_H,
                                LV_GRID_TEMPLATE_LAST};
 
 static speed_page_t pg;
@@ -74,7 +72,6 @@ static speed_page_t pg;
 static btn_group_t btn_group_tuner;
 static btn_group_t btn_group_overlay;
 static btn_group_t btn_group_menu_async_display;
-static btn_group_t btn_group_playback_keep_tmg;
 static btn_group_t btn_group_audio;
 static btn_group_t btn_group_dvr_stop_wait;
 static btn_group_t btn_group_dvr_start_wait;
@@ -100,11 +97,6 @@ static bool row_inert(int row) {
         // Menu Over Video on showed the marker never once.
         return g_setting.speed.keep_display;
 
-    case ROW_PLAYBACK_KEEP_TMG:
-        // Without the overlay the menu already took the display at 1080p on
-        // the way in, so Playback has no handover to do and no dispw to skip.
-        return !g_setting.speed.keep_display;
-
     case ROW_DVR_STOP_WAIT:
         // Deferring the stop means not waiting for it here at all, so there is
         // no wait left for this row to shorten. It still decides how the wait
@@ -116,8 +108,7 @@ static bool row_inert(int row) {
     }
 }
 
-static const int inert_rows[] = {ROW_FAST_MENU, ROW_MENU_ASYNC_DISPLAY,
-                                ROW_PLAYBACK_KEEP_TMG, ROW_DVR_STOP_WAIT};
+static const int inert_rows[] = {ROW_FAST_MENU, ROW_MENU_ASYNC_DISPLAY, ROW_DVR_STOP_WAIT};
 
 static void rows_refresh(void) {
     for (size_t i = 0; i < sizeof(inert_rows) / sizeof(inert_rows[0]); ++i)
@@ -132,9 +123,6 @@ static const char *comment_text(int row) {
 
         case ROW_MENU_ASYNC_DISPLAY:
             return _lang("Nothing to do while Menu Over Video is on: the display is not changed at all.");
-
-        case ROW_PLAYBACK_KEEP_TMG:
-            return _lang("Nothing to do while Menu Over Video is off: the menu already took the display.");
 
         case ROW_DVR_STOP_WAIT:
             return _lang("Nothing to do while Defer DVR Stop is on: the switch does not wait for it.");
@@ -155,9 +143,6 @@ static const char *comment_text(int row) {
 
     case ROW_MENU_ASYNC_DISPLAY:
         return _lang("The recorder and audio stop run beside dispw. The video goes at the press, not after.");
-
-    case ROW_PLAYBACK_KEEP_TMG:
-        return _lang("Playback keeps the video's timing instead of rebuilding for 1080p. Check the picture.");
 
     case ROW_SKIP_AUDIO:
         return _lang("No effect on sound. From the second switch onward, so not at start-up.");
@@ -251,8 +236,6 @@ static lv_obj_t *page_switch_speed_create(lv_obj_t *parent, panel_arr_t *arr) {
                  g_setting.speed.fast_menu, SAVING_FAST_MENU, ROW_FAST_MENU);
     speed_toggle(&pg, &btn_group_menu_async_display, "Async Menu Display",
                  g_setting.speed.menu_async_display, SAVING_MENU_ASYNC_DSP, ROW_MENU_ASYNC_DISPLAY);
-    speed_toggle(&pg, &btn_group_playback_keep_tmg, "720p Playback",
-                 g_setting.speed.playback_keep_timing, SAVING_PLAYBACK_TMG, ROW_PLAYBACK_KEEP_TMG);
     speed_toggle(&pg, &btn_group_audio, "Skip Audio Setup",
                  g_setting.speed.skip_audio, SAVING_SKIP_AUDIO, ROW_SKIP_AUDIO);
 
@@ -322,10 +305,6 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_MENU_ASYNC_DISPLAY:
         speed_store(&btn_group_menu_async_display, &g_setting.speed.menu_async_display, "speed", "menu_async_display");
-        break;
-
-    case ROW_PLAYBACK_KEEP_TMG:
-        speed_store(&btn_group_playback_keep_tmg, &g_setting.speed.playback_keep_timing, "speed", "playback_keep_timing");
         break;
 
     case ROW_SKIP_AUDIO:

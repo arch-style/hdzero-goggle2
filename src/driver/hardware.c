@@ -738,24 +738,15 @@ static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
     g_hw_stat.vdpo_tmg = tmg;
 }
 
-// Set by Display_UI_keep_timing() for the one call that follows it: everything
-// in Display_UI_init() except dispw is I2C and aww, tens of milliseconds, and
-// the panel timing is a function of the resolution rather than of UI versus
-// video -- OLED_SetTMG's own comment says 0=1080P, 1=720P. So the UI can be
-// taken at whatever timing is already up, without paying dispw's 1.1s for a
-// mode the display is not going to change to.
-static bool vdpo_keep_on_next_ui = false;
-
 void Display_UI_init() {
     // The boot call configures the display for the menu, and the switch to the
     // last source immediately reconfigures it for the video, paying dispw's
     // second measured at over a second twice over. Skipping the first one
     // leaves the boot UI on whatever mode the kernel set up.
     static bool first_call = true;
-    bool skip_timing = (first_call && g_setting.speed.boot_display) || vdpo_keep_on_next_ui;
+    bool skip_timing = first_call && g_setting.speed.boot_display;
 
     first_call = false;
-    vdpo_keep_on_next_ui = false;
 
     g_hw_stat.source_mode = SOURCE_MODE_UI;
     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
@@ -780,16 +771,6 @@ void Display_UI_init() {
         I2C_Write(ADDR_FPGA, 0xa7, 0x00);
 
     system_exec("aww 0x06542018 0x00000044"); // disable horizontal chroma FIR filter.
-}
-
-// Hands the display to the UI without changing its timing: the FPGA source
-// select, the clock phases and the OLED mode still move, so what is on the
-// panel is the SoC's output rather than the live source, at the size it
-// already is. The caller is responsible for everything it draws being that
-// size -- the player's layer and the VO rectangle both follow the display.
-void Display_UI_keep_timing(void) {
-    vdpo_keep_on_next_ui = true;
-    Display_UI();
 }
 
 void Display_UI() {
