@@ -352,6 +352,29 @@ static void dvr_wait_started(bool was_running) {
     dvr_poll_status(true, "start");
 }
 
+// A deferred stop is the record process still working on the file it has been
+// told to close: it goes on taking frames from VI until it finalises, about
+// three seconds after the recording started. Whatever the comment above says,
+// not everything between the stop and the next start is its own -- pulling the
+// video out from under it in that window lands in the file. A channel change
+// leaves the pipeline as it was and only loses a moment of signal; closing the
+// tuner for a bandwidth change, or switching the source outright, writes
+// several seconds of a picture that is no longer there.
+//
+// So callers about to do one of those collect the stop first. It costs the
+// wait that deferring saved, but only for a recording that was actually
+// running, and only on the two actions that break it.
+void dvr_collect_stop(void) {
+    pthread_mutex_lock(&dvr_mutex);
+
+    if (dvr_stop_outstanding) {
+        dvr_poll_status(false, "stop collected");
+        dvr_stop_outstanding = false;
+    }
+
+    pthread_mutex_unlock(&dvr_mutex);
+}
+
 void dvr_cmd(osd_dvr_cmd_t cmd) {
     LOGI("dvr_cmd: sdcard=%d, recording=%d, cmd=%d", g_sdcard_enable, dvr_is_recording, cmd);
 

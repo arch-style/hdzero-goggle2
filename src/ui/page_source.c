@@ -163,7 +163,22 @@ void source_status_timer() {
     }
 }
 
+// The recorder is configured for the source it was started on, and a source
+// change rewrites that configuration under it: app_switch_to_analog() and the
+// two after it call dvr_update_vi_conf() themselves. Nothing stopped the
+// recording first, so a file that was open across a source change carried on
+// as a 720p HDZero recording of whatever the other input was putting out --
+// grey, green, geometry from neither. Seen on the goggles as hdz_0052.ts.
+//
+// Stop it, and wait for the file to be closed before the video goes: a
+// deferred stop is a record process still writing.
+static void source_stop_recording(void) {
+    dvr_cmd(DVR_STOP);
+    dvr_collect_stop();
+}
+
 static void page_source_select_hdzero() {
+    source_stop_recording();
     progress_bar.start = 1;
     app_switch_to_hdzero(true);
     app_state_push(APP_STATE_VIDEO);
@@ -173,11 +188,14 @@ static void page_source_select_hdzero() {
 }
 
 static void page_source_select_hdmi_in() {
-    if (g_source_info.hdmi_in_status)
+    if (g_source_info.hdmi_in_status) {
+        source_stop_recording();
         app_switch_to_hdmi_in();
+    }
 }
 
 static void page_source_select_av_in() {
+    source_stop_recording();
     app_switch_to_av_in();
     app_state_push(APP_STATE_VIDEO);
     g_source_info.source = SOURCE_AV_IN;
@@ -186,6 +204,7 @@ static void page_source_select_av_in() {
 }
 
 static void page_source_select_analog() {
+    source_stop_recording();
     app_switch_to_analog();
     app_state_push(APP_STATE_VIDEO);
     g_source_info.source = SOURCE_ANALOG;
@@ -254,7 +273,11 @@ void source_toggle_hdzero_bw() {
     btn_group_set_sel(&btn_group1, g_setting.source.hdzero_bw);
 
     if (g_source_info.source == SOURCE_HDZERO) {
+        // The bandwidth is set inside the tuner init, so this closes the
+        // receivers for the best part of a second. A recording still being
+        // finalised would take all of that.
         dvr_cmd(DVR_STOP);
+        dvr_collect_stop();
         app_switch_to_hdzero(true);
     }
 }
