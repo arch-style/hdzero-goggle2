@@ -100,8 +100,13 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 - `Next channel` / `Previous channel` は選局処理そのものを呼ぶので、Favorites CH の登録があれば
   その 8 つを巡回し、band の端では反対側へ回り込み、チャンネル OSD も出る。
   SD カードの `no_dial.txt` で映像中の選局を止めているときは、このボタンも効かない
-- `HDZero Wide/Narrow` は HDZero 視聴中なら受信機を開き直すので映像が一瞬切れる。
+- `HDZero Wide/Narrow` は HDZero 視聴中なら受信機を開き直すので映像が切れる。
+  帯域幅はチューナ init の中で決まるため、開き直す以外に反映の方法が無い。
+  実測 (`2026-09-08 04:03:02.778` の押下, 高速化を全 ON): 押下から映像復帰まで 945ms
+  (うち `DM6302_init` 788ms)、`to_hdzero done` まで 1031ms。
   他のソースを見ているときは設定を保存するだけで、次に HDZero にしたときから効く
+- 選局ボタンの実測 (同じ起動, `04:03:41.694` の押下): 押下から映像復帰まで 168ms、
+  `to_hdzero done` まで 260ms。帯域幅を変えないので `DM6302_init` が要らない
 
 ### Favorites CH
 
