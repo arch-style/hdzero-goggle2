@@ -42,20 +42,53 @@ static pthread_mutex_t spi_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define SPI_BURST_REFUSALS_MAX 20
 #define SPI_BURST_REFUSALS_LOGGED 5
 
+// A burst that succeeds after five seconds is the same fault as one that is
+// refused, and worse to live with: the driver reports success, so nothing
+// above notices, while the bus lock is held for all of it and every other
+// thread on the port stops. Measured on the goggles at 5006, 5009 and 5076ms,
+// always this transaction and never a single-register write.
+//
+// Two of them and the burst goes for the session. What that costs is the
+// 0.6-0.9s a tuner init saves by sending seven registers at once; what it
+// buys is not doing five seconds of nothing in the middle of a switch.
+#define SPI_BURST_SLOW_MS 500
+#define SPI_BURST_SLOW_MAX 2
+
 static bool spi_burst_refused = false;
 static unsigned spi_burst_refusals = 0;
+static unsigned spi_burst_slow = 0;
+
+// Counted where it succeeded, so the caller carries on with the value written.
+static void spi_burst_took(uint32_t ms) {
+    if (ms < SPI_BURST_SLOW_MS)
+        return;
+
+    spi_burst_slow++;
+    LOGE("SPI: burst took %ums, %u so far", ms, spi_burst_slow);
+
+    if (spi_burst_slow >= SPI_BURST_SLOW_MAX && !spi_burst_refused) {
+        spi_burst_refused = true;
+        LOGE("SPI: burst disabled after %u slow writes", spi_burst_slow);
+    }
+}
 
 static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t count) {
     if (g_setting.speed.spi_burst && !spi_burst_refused) {
+        uint32_t started_ms = time_ms();
         int err = I2C_Write_Burst(ADDR_FPGA, regs, vals, count);
 
-        if (err == 0)
+        if (err == 0) {
+            spi_burst_took(time_ms() - started_ms);
             return true;
+        }
 
         usleep(300);
+        started_ms = time_ms();
         err = I2C_Write_Burst(ADDR_FPGA, regs, vals, count);
-        if (err == 0)
+        if (err == 0) {
+            spi_burst_took(time_ms() - started_ms);
             return true;
+        }
 
         spi_burst_refusals++;
         if (spi_burst_refusals <= SPI_BURST_REFUSALS_LOGGED)
