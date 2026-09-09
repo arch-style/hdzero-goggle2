@@ -369,11 +369,32 @@ static bool menu_scaled = false;
 
 bool main_menu_is_shown(void);
 
+// Whether the menu is the thing being looked at. Not LV_OBJ_FLAG_HIDDEN: with
+// Menu Over Video the menu is never hidden, only covered by the OSD screen,
+// and main_menu_show(false) -- the branch that used to put the antialiasing
+// back -- is called from nowhere at all. The app state is what actually
+// changes on the way to the picture, by every route there is.
+static bool menu_is_on_screen(void) {
+    switch (g_app_state) {
+    case APP_STATE_MAINMENU:
+    case APP_STATE_SUBMENU:
+    case APP_STATE_SUBMENU_ITEM_FOCUSED:
+    case APP_STATE_PLAYBACK:
+    case APP_STATE_WIFI:
+    // Only ever entered from the firmware page, which is a menu page and
+    // stays on screen for the whole flash.
+    case APP_STATE_USER_INPUT_DISABLED:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // The flag is global, so drop it only while the scaled menu is the thing on
 // screen and restore it the moment it is not. Video and the OSD then never
 // render under a setting the menu asked for.
 void main_menu_apply_antialiasing(void) {
-    bool off = g_setting.speed.menu_antialias_off && menu_scaled && main_menu_is_shown();
+    bool off = g_setting.speed.menu_antialias_off && menu_scaled && menu_is_on_screen();
 
     lvgl_set_antialiasing(!off);
 }

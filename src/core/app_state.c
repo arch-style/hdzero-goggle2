@@ -31,6 +31,10 @@ extern int user_select_index;
 
 void app_state_push(app_state_t state) {
     g_app_state = state;
+
+    // Menu Antialias OFF is scoped to the menu being on screen, and the state
+    // is what says so. Costs a compare and a store.
+    main_menu_apply_antialiasing();
 }
 
 // True while the menu is drawn over a running picture rather than having taken
