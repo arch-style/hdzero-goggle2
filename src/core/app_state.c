@@ -33,6 +33,40 @@ void app_state_push(app_state_t state) {
     g_app_state = state;
 }
 
+// True while the menu is drawn over a running picture rather than having taken
+// the display for itself. Set by the switch below, cleared by leaving the menu
+// or by app_menu_end_overlay().
+static bool menu_over_video = false;
+
+// Menu Over Video leaves the FPGA selecting the live source and the panel on
+// that source's timing, with the menu drawn into the UI layer over the top.
+// That is all the menu needs and it is not enough for anything that plays
+// video of its own: the player builds a 1920x1080 layer and hands its frames
+// to the SoC's VO, which is not what the display is showing or the size it is
+// showing it at, so the picture comes out sheared and the wrong scale.
+//
+// This finishes the switch the overlay skipped. Leaving the menu afterwards
+// goes through app_switch_to_hdzero(), which sets the timing and reopens the
+// tuner whatever state they were left in, so there is nothing to put back.
+void app_menu_end_overlay(void) {
+    if (!menu_over_video)
+        return;
+
+    menu_over_video = false;
+    LOGI("switch mark: ending the overlay");
+
+    Display_UI();
+    lvgl_switch_to_1080p();
+
+    if (g_setting.speed.fast_menu)
+        HDZero_Standby();
+    else
+        HDZero_Close();
+
+    Analog_Module_Power(0, 0);
+    LOGI("switch mark: overlay ended");
+}
+
 // The part of the menu switch that is about recording and audio rather than
 // the picture: independent of the display timing, so it can run either side
 // of the wait for it. The mirror of hdzero_recording_side() below.
@@ -58,6 +92,8 @@ void app_switch_to_menu() {
     // exactly as it does for the OSD, and let the menu draw into that layer.
     // The menu is laid out for 1080p, so at 720p it is cropped.
     bool overlay = g_setting.speed.keep_display && vdpo_timing_applied();
+
+    menu_over_video = overlay;
 
     // The menu is 1080p50 whatever the video was, so unlike the video
     // direction there is nothing to work out: the timing can be asked for
@@ -120,6 +156,9 @@ void app_switch_to_menu() {
 }
 
 void app_exit_menu() {
+    // Whatever the overlay left behind, the switch below sets it.
+    menu_over_video = false;
+
     switch (g_source_info.source) {
     case SOURCE_HDZERO:
         progress_bar.start = 1;
