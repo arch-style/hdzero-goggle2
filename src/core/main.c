@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
     // Anchored here so the total covers everything, device_init() included.
     // Started after that, it missed the very work Async Motion Sensor moves
     // and reported a 169ms change for what was really 641ms.
-    uint32_t boot_start_ms = time_ms();
+    g_boot_start_ms = time_ms();
 
     pthread_mutex_init(&lvgl_mutex, NULL);
 
@@ -324,11 +324,11 @@ int main(int argc, char *argv[]) {
     // nothing when there is nothing outstanding.
     vdpo_timing_collect();
 
-    // One line to compare boots by, since the phases alone have proved
-    // misleading: they said deferring the menu was faster while the run as a
-    // whole was slower, the difference sitting in things that vary by
-    // hundreds of milliseconds on their own.
-    LOGI("boot total: app start to video %ums", time_ms() - boot_start_ms);
+    // This one is the end of the switch, not the picture. They used to be the
+    // same moment; they stopped being it when the audio and DVR set-up moved
+    // behind the picture, so the number to compare boots by is the "boot:
+    // picture at" line that app_switch_to_hdzero() logs.
+    LOGI("boot total: app start to switch done %ums", time_ms() - g_boot_start_ms);
 
     create_threads();
 

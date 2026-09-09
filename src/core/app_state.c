@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "core/common.hh"
 #include "core/dvr.h"
 #include "core/input_device.h"
 #include "core/msp_displayport.h"
@@ -21,6 +22,7 @@
 #include "ui/ui_main_menu.h"
 #include "ui/ui_porting.h"
 #include "util/system.h"
+#include "util/time.h"
 
 app_state_t g_app_state = APP_STATE_MAINMENU;
 
@@ -325,6 +327,11 @@ void app_switch_to_hdzero(bool is_default) {
 
     channel_osd_mode = CHANNEL_SHOWTIME;
     LOGI("switch mark: display mode set");
+
+    // The moment there is a picture, which is the number worth comparing
+    // boots by: everything after this point the pilot does not wait for.
+    if (g_init_done == 0)
+        LOGI("boot: picture at %ums", time_ms() - g_boot_start_ms);
 
     if (CAM_MODE == VR_1080P30 || CAM_MODE == VR_1080P24)
         lvgl_switch_to_1080p();
