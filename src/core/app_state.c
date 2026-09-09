@@ -57,6 +57,11 @@ void app_menu_end_overlay(void) {
 
     Display_UI();
     lvgl_switch_to_1080p();
+    // The menu was fitted to the 720p screen on the way in and the display has
+    // just become 1080p underneath it. Its zoom is worked out once, in
+    // main_menu_show(), so without this the page carries on drawing at two
+    // thirds size in the top left corner of a screen half as big again.
+    main_menu_refit_display();
 
     if (g_setting.speed.fast_menu)
         HDZero_Standby();

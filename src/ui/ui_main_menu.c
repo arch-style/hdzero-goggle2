@@ -402,6 +402,17 @@ static void main_menu_fit_display(void) {
     LOGI("menu: zoom %d/%d for %dpx display", zoom, LV_IMG_ZOOM_NONE, ver_res);
 }
 
+// main_menu_show() fits the menu on the way in, which is enough for anything
+// that changes the display before the menu is up. Something that changes it
+// while the menu is already on screen has to say so: the zoom is worked out
+// once from the resolution at the time, and nothing recomputes it.
+void main_menu_refit_display(void) {
+    main_menu_fit_display();
+    // menu_scaled has just changed, and it is half of what decides whether the
+    // antialiasing is off.
+    main_menu_apply_antialiasing();
+}
+
 // Built after the OSD screen when deferred, which would leave it drawn on
 // top of the video. Put it back underneath, where creating it first would
 // have left it.
