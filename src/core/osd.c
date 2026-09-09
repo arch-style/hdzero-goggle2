@@ -643,8 +643,18 @@ void osd_hdzero_update(void) {
         g_osd_update_cnt++;
     }
 
-    if (fhd_change())
-        return;
+    // Only while the picture is the thing on screen. Menu Over Video leaves
+    // the FPGA on the live source, so HDZERO_detect() keeps running and a
+    // camera changing between 720p and 1080p still raises fhd_req -- and
+    // fhd_change() ends with osd_show(true), which puts the OSD screen over
+    // the menu the user is in the middle of using, at the old zoom. The
+    // request is not cleared here, so it is applied on the way back to video.
+    if (g_app_state == APP_STATE_VIDEO ||
+        g_app_state == APP_STATE_IMS ||
+        g_app_state == APP_STATE_OSD_ELEMENT_PREV) {
+        if (fhd_change())
+            return;
+    }
 
     // if the user is in the osd element position settings, show all elements
     if (g_app_state == APP_STATE_OSD_ELEMENT_PREV) {
