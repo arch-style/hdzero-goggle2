@@ -245,6 +245,9 @@ void source_toggle_hdzero_bw() {
                                      ? SETTING_SOURCES_HDZERO_BW_NARROW
                                      : SETTING_SOURCES_HDZERO_BW_WIDE;
     ini_putl("source", "hdzero_bw", g_setting.source.hdzero_bw, SETTING_INI);
+    // The switch this causes is otherwise indistinguishable in the log from a
+    // channel change, and this fork is read from its logs.
+    LOGI("hdzero bw: %s", g_setting.source.hdzero_bw == SETTING_SOURCES_HDZERO_BW_NARROW ? "narrow" : "wide");
 
     // Keep the row on this page in step. Before the page is built its button
     // group holds no buttons, and this is then a no-op.
