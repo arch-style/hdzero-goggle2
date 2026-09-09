@@ -322,6 +322,12 @@ typedef struct {
     // The script sleeps a second and then kills things that are not running,
     // and it blocks the main loop for 1.08s right after the picture appears.
     bool skip_wifi_stop;
+    // Start the video timing change at start-up rather than at the switch.
+    // dispw is 1.1s and it is the last thing the switch waits for, so run it
+    // during the UI build instead. Needs Skip Display Setup (else the menu's
+    // own timing runs a second dispw) and Skip Boot Menu (the panel stays
+    // dark until the video arrives instead of lighting mid-reconfiguration).
+    bool boot_display_early;
 } setting_speed_t;
 
 typedef struct {

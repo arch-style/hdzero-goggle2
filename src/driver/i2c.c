@@ -218,7 +218,18 @@ int i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const 
     int err = errno;
     i2c_bus_unlock(port);
 
-    return ret < 0 ? -err : 0;
+    if (ret == count)
+        return 0;
+
+    // I2C_RDWR answers with the number of messages it managed to send, so a
+    // short count is a failure with a plausible-looking return: the tail of
+    // the sequence never reached the device, and for the tuner's SPI bridge
+    // the tail is the command register. Report it so the caller redoes the
+    // whole sequence rather than assuming it landed.
+    if (ret >= 0)
+        return -EIO;
+
+    return err ? -err : -EIO;
 }
 
 uint8_t i2c_read(int port, uint8_t slave_address, uint8_t addr) {

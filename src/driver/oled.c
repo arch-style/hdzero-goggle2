@@ -8,6 +8,7 @@
 
 #include "../core/common.hh"
 #include "../core/defines.h"
+#include "hardware.h"
 #include "i2c.h"
 #include "msp_displayport.h"
 #include "uart.h"
@@ -377,6 +378,13 @@ void OLED_ReadBack();
 // OLED display on/off
 void OLED_display(int on) {
     static int last_on = -1;
+
+    // A background dispw is rewriting the display output. Lighting the panel
+    // into that is what the blank before a mode change exists to avoid, and
+    // at start-up OLED_Pattern() would otherwise do exactly that halfway
+    // through. Whoever collects the change turns the panel on afterwards.
+    if (on && vdpo_timing_pending())
+        return;
 
     if (GOGGLE_VER_2) {
         if (last_on != on)

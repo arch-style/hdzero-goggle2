@@ -99,8 +99,14 @@ void Display_UI_init();
 // state from the assumed boot one.
 bool vdpo_timing_applied(void);
 // True while a background timing change has been started and not yet
-// collected by vdpo_set_timing().
+// collected by vdpo_set_timing(). This outlasts dispw itself; for "is the
+// display still being reconfigured right now", use vdpo_timing_running().
 bool vdpo_timing_pending(void);
+// True only while the dispw process is actually running.
+bool vdpo_timing_running(void);
+// Finish any outstanding background timing change. A no-op when there is
+// none; there so no path can leave one hanging.
+void vdpo_timing_collect(void);
 // Begin a display timing change in the background; the next vdpo_set_timing()
 // for the same timing collects it instead of running dispw itself.
 void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode);

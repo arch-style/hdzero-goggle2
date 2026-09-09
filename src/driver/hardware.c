@@ -590,10 +590,10 @@ void Display_VO_SWITCH(uint8_t sel) // 0 = UI;  1 = HDZERO or AV_in or HDMI_in
     if (sel && g_hw_stat.hdzero_open && (g_hw_stat.source_mode == SOURCE_MODE_HDZERO))
         DM6302_openM0(1);
     else if (!HDZero_open_pending())
-        // With the async open running the chip is in reset or mid-init, and
-        // DM6302_init() writes this register to zero itself, so the boot-time
-        // close from Display_UI_init() has nothing to add and stays off the
-        // init sequence.
+        // While an async open is outstanding this would push an SPI sequence
+        // into the middle of the init for no gain: DM6302_M0() leaves the
+        // register at zero anyway, so the boot-time close from
+        // Display_UI_init() has nothing to add.
         DM6302_openM0(0);
 
     I2C_Write(ADDR_FPGA, 0x06, 0x0F);
@@ -625,6 +625,18 @@ bool vdpo_timing_pending(void) {
     return vdpo_pending;
 }
 
+// vdpo_pending only says a worker was started and not yet joined; it stays
+// true long after dispw itself has exited, because the join happens at the
+// point the timing is needed. Anyone deciding what to do *while* dispw runs
+// needs to know whether the child is actually still there, so the worker
+// clears this the moment system_exec() returns. A stale read costs one
+// ordering decision, never correctness, so a plain flag is enough.
+static volatile bool vdpo_child_running = false;
+
+bool vdpo_timing_running(void) {
+    return vdpo_child_running;
+}
+
 // dispw is over a second and it configures the SoC's display output, which
 // has nothing to do with the tuner coming up on the FPGA's I2C. Run it on a
 // worker started before the tuner init, and collect it where the timing is
@@ -641,11 +653,22 @@ static void *vdpo_worker(void *arg) {
     (void)arg;
     snprintf(buf, sizeof(buf), "dispw -s vdpo %s", vdpo_pending_mode);
     system_exec(buf);
+    vdpo_child_running = false;
 
     return NULL;
 }
 
-static void vdpo_collect(void) {
+static void vdpo_collect_locked(void);
+
+// For a caller that just wants any outstanding timing change finished, with
+// no timing of its own to ask for. Does nothing when none is outstanding.
+void vdpo_timing_collect(void) {
+    pthread_mutex_lock(&hardware_mutex);
+    vdpo_collect_locked();
+    pthread_mutex_unlock(&hardware_mutex);
+}
+
+static void vdpo_collect_locked(void) {
     if (!vdpo_pending)
         return;
 
@@ -672,7 +695,10 @@ void vdpo_start_timing_async(vdpo_tmg_t tmg, const char *mode) {
     snprintf(vdpo_pending_mode, sizeof(vdpo_pending_mode), "%s", mode);
     vdpo_pending_tmg = tmg;
 
+    // Raised before the create so the worker cannot clear it first.
+    vdpo_child_running = true;
     if (pthread_create(&vdpo_thread, NULL, vdpo_worker, NULL) != 0) {
+        vdpo_child_running = false;
         LOGE("vdpo: could not start the async timing change");
         goto done;
     }
@@ -694,7 +720,7 @@ static void vdpo_set_timing(vdpo_tmg_t tmg, const char *mode) {
         // if it was this one there is nothing left to do.
         vdpo_tmg_t started = vdpo_pending_tmg;
 
-        vdpo_collect();
+        vdpo_collect_locked();
         if (started == tmg) {
             LOGI("vdpo: collected %s", mode);
             return;
@@ -912,6 +938,12 @@ static int hdz_async_bw;
 // inline, none the wiser.
 static __thread bool hdz_in_worker = false;
 
+// Set when the worker gave up on a tuner that would not answer, so the main
+// thread's own HDZero_open() right afterwards does not spend a second retry
+// on it: four ten-cycle DM6302_init() runs back to back is the best part of
+// ten seconds of nothing. Cleared again as soon as an open gets anywhere.
+static bool hdz_async_init_failed = false;
+
 static void *hdz_async_worker(void *arg) {
     (void)arg;
 
@@ -973,7 +1005,7 @@ void HDZero_open(int bw) {
         // retry. Leaving it closed means the next switch tries again.
         int init_failed = DM6302_init(0, g_hw_stat.hdz_bw);
 
-        if (init_failed && g_setting.bugfix.retry_tuner_init) {
+        if (init_failed && g_setting.bugfix.retry_tuner_init && !hdz_async_init_failed) {
             // Straight away, because at boot there is no next switch to wait
             // for: without this the picture stays wrong until the user
             // happens to open the menu and come back. One extra attempt only,
@@ -987,9 +1019,13 @@ void HDZero_open(int bw) {
             LOGE("HDZero: receivers still not up, leaving closed to retry");
             g_hw_stat.hdzero_open = 0;
             g_hw_stat.hdz_standby = 0;
+            // Only the worker's failure carries forward; a failure here has
+            // already skipped its retry, so the next switch starts clean.
+            hdz_async_init_failed = hdz_in_worker;
             return;
         }
 
+        hdz_async_init_failed = false;
         DM5680_SetBB(1);
         g_hw_stat.hdzero_open = 1;
         g_hw_stat.hdz_standby = 0;

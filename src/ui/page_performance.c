@@ -26,6 +26,7 @@ enum {
     ROW_SKIP_BOOT_MENU,
     ROW_ASYNC_IMU,
     ROW_ASYNC_DISPLAY,
+    ROW_EARLY_TIMING,
     ROW_ASYNC_TUNER,
     ROW_SKIP_WIFI_STOP,
     ROW_HEAD_INPUT,
@@ -42,14 +43,17 @@ enum {
 
 // Measured on the goggles with the switch path instrumented, so the cost of
 // leaving one off is visible rather than implied.
+// Where two of these hide work in the same window they cannot both claim it,
+// so each figure is what that switch is worth ON ITS OWN and the comment
+// under the list says where it overlaps another.
 #define SAVING_FAST_MENU      "-2300ms"
 #define SAVING_KEEP_DISPLAY   "-1100ms x2"
-#define SAVING_SKIP_AUDIO     "-460ms"
+#define SAVING_SKIP_AUDIO     "-460ms switch"
 #define SAVING_BOOT_DISPLAY   "-1140ms"
-#define SAVING_BOOT_FONTS     "-1000ms"
+#define SAVING_BOOT_FONTS     "-550..-1000ms"
 #define SAVING_SKIP_BOOT_MENU "no menu flash"
 #define SAVING_ASYNC_IMU      "-686ms"
-#define SAVING_ASYNC_DISPLAY  "-1100ms"
+#define SAVING_ASYNC_DISPLAY  "-1092ms alone"
 #define SAVING_UI_THROTTLE    "200Hz > 20Hz"
 #define SAVING_LABEL_DIFF     "no redraw"
 #define SAVING_LONG_PRESS     "500ms fixed"
@@ -57,10 +61,10 @@ enum {
 #define SAVING_BUTTON_BEEP    "50 / 200ms"
 #define SAVING_DIAL_BEEP      "15ms"
 #define SAVING_ANTIALIAS      "faster redraw"
-// Not yet measured on the goggles; the switch log will say.
-#define SAVING_SPI_BURST      "7 > 1 I2C"
-#define SAVING_ASYNC_TUNER    "est. -900ms"
-#define SAVING_SKIP_WIFI_STOP "-1080ms"
+#define SAVING_SPI_BURST      "-715ms tuner"
+#define SAVING_ASYNC_TUNER    "-844ms alone"
+#define SAVING_SKIP_WIFI_STOP "-1080ms after"
+#define SAVING_EARLY_TIMING   "est. -364ms"
 
 // create_btn_group_item() gives its label a 320px box at column 1 and puts the
 // first button's arrow at the start of column 2, so column 1 has to be wider
@@ -88,6 +92,7 @@ static lv_coord_t row_dsc[] = {PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
                                PERF_ROW_H, PERF_ROW_H, PERF_ROW_H, PERF_ROW_H,
+                               PERF_ROW_H, PERF_ROW_H,
                                LV_GRID_TEMPLATE_LAST};
 
 static btn_group_t btn_group_tuner;
@@ -122,6 +127,7 @@ static btn_group_t btn_group_antialias;
 static btn_group_t btn_group_spi_burst;
 static btn_group_t btn_group_async_tuner;
 static btn_group_t btn_group_skip_wifi_stop;
+static btn_group_t btn_group_early_timing;
 static lv_obj_t *perf_cont;
 static lv_obj_t *perf_comment;
 
@@ -165,25 +171,25 @@ static const char *perf_comment_text(int row) {
         return _lang("The menu then uses the video resolution, scaled down below 1080p.");
 
     case ROW_SKIP_AUDIO:
-        return _lang("No effect on sound. Takes effect from the second switch onward.");
+        return _lang("No effect on sound. From the second switch onward, so not at start-up.");
 
     case ROW_ANTIALIAS_OFF:
         return _lang("Only while the menu is scaled. Restored when it closes.");
 
     case ROW_SPI_BURST:
-        return _lang("Every tuner init and channel change. Falls back by itself if refused.");
+        return _lang("Tuner init 1663ms to 948ms. Hidden behind the display change at start-up.");
 
     case ROW_ASYNC_TUNER:
-        return _lang("Applies at the next start-up, only when it goes straight to HDZero video.");
+        return _lang("Next start-up, straight to HDZero video only. Near zero unless Early Video Timing is on.");
 
     case ROW_SKIP_WIFI_STOP:
-        return _lang("Applies at the next start-up. Still runs if the WiFi driver is loaded.");
+        return _lang("Frees the main loop for a second after the video, not before it.");
 
     case ROW_BOOT_DISPLAY:
         return _lang("Applies at the next start-up. The boot screen keeps the kernel's mode.");
 
     case ROW_BOOT_FONTS:
-        return _lang("Applies at the next start-up.");
+        return _lang("Applies at the next start-up. Worth more when the fonts are on the card.");
 
     case ROW_SKIP_BOOT_MENU:
         return _lang("The menu is on screen during start-up until the video covers it.");
@@ -193,6 +199,9 @@ static const char *perf_comment_text(int row) {
 
     case ROW_ASYNC_DISPLAY:
         return _lang("Runs with the tuner init. The panel blanks a little earlier.");
+
+    case ROW_EARLY_TIMING:
+        return _lang("Next start-up, and only with Skip Display Setup and Skip Boot Menu on.");
 
     case ROW_UI_THROTTLE:
         return _lang("Status bar only. Its values are measured twice a second anyway.");
@@ -290,6 +299,9 @@ static lv_obj_t *page_performance_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_toggle(&btn_group_async_display, cont, "Async Display Setup",
                   g_setting.speed.async_display, SAVING_ASYNC_DISPLAY, ROW_ASYNC_DISPLAY);
+
+    create_toggle(&btn_group_early_timing, cont, "Early Video Timing",
+                  g_setting.speed.boot_display_early, SAVING_EARLY_TIMING, ROW_EARLY_TIMING);
 
     create_toggle(&btn_group_async_tuner, cont, "Async Tuner Init",
                   g_setting.speed.async_tuner, SAVING_ASYNC_TUNER, ROW_ASYNC_TUNER);
@@ -425,6 +437,10 @@ static void on_click(uint8_t key, int sel) {
 
     case ROW_ASYNC_DISPLAY:
         toggle_setting(&btn_group_async_display, &g_setting.speed.async_display, "async_display");
+        break;
+
+    case ROW_EARLY_TIMING:
+        toggle_setting(&btn_group_early_timing, &g_setting.speed.boot_display_early, "boot_display_early");
         break;
 
     case ROW_ASYNC_TUNER:

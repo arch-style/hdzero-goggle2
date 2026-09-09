@@ -204,7 +204,7 @@ void app_switch_to_hdmi_in() {
 // Which display timing the camera mode below will ask for. Mirrors the switch
 // further down, so the two have to stay in step; getting it wrong only costs
 // the head start, since vdpo_set_timing() runs the right one either way.
-static void start_display_timing_early(void) {
+void start_display_timing_early(void) {
     switch (CAM_MODE) {
     case VR_720P50:
     case VR_720P60:
@@ -278,13 +278,14 @@ void app_switch_to_hdzero(bool is_default) {
     LOGI("switch mark: channel tuned");
 
     // The audio and recorder set-up below is half a second of forked
-    // scripts that has nothing to do with the display. When the timing
-    // change is still running in the background, which it is whenever the
-    // tuner was already up, do that work now instead of after waiting for
-    // it; otherwise the picture comes first, as before.
+    // scripts that has nothing to do with the display, so it is free as long
+    // as dispw is still running and the switch would be waiting anyway. The
+    // test has to be liveness, not vdpo_timing_pending(): that stays true
+    // until the join, and doing this after dispw had already exited put the
+    // whole half second in front of the picture instead of beside it.
     bool side_done = false;
 
-    if (g_setting.speed.async_display && vdpo_timing_pending()) {
+    if (g_setting.speed.async_display && vdpo_timing_running()) {
         LOGI("switch mark: audio and dvr while the display changes");
         hdzero_recording_side();
         side_done = true;
@@ -313,7 +314,14 @@ void app_switch_to_hdzero(bool is_default) {
 
     default:
         perror("switch_to_video CaM_MODE error");
+        break;
     }
+
+    // Every case above collects the background timing change, except the one
+    // that recognises no camera mode at all. Nothing else would, and until
+    // something does the panel stays dark, so close that off here. A no-op
+    // on every normal path.
+    vdpo_timing_collect();
 
     channel_osd_mode = CHANNEL_SHOWTIME;
     LOGI("switch mark: display mode set");

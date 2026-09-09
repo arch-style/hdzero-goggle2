@@ -309,17 +309,21 @@ static void page_wifi_update_settings() {
     ini_puts("wifi", "root_pw", g_setting.wifi.root_pw, SETTING_INI);
     settings_put_bool("wifi", "ssh", g_setting.wifi.ssh);
 
-    // Prepare WiFi interfaces. At start-up the driver is normally not
-    // loaded and nothing the script kills is running, yet its sleep still
-    // costs a second of main loop right after the picture appears. The module
-    // check keeps the stop for the one case it matters, an app restart with
-    // WiFi left up.
+    // Prepare WiFi interfaces. wlan_stop.sh is three things: a one second
+    // sleep, rmmods, and killing the services. At start-up with the driver
+    // absent the sleep buys nothing and the rmmods have nothing to remove,
+    // but the services can still be there -- an app restart leaves dropbear
+    // running while the driver is gone, and page_wifi_update_services() below
+    // would then start a second one. So the skip drops the sleep and the
+    // rmmods and keeps the killing, which is one fork instead of a second.
     bool driver_loaded = (access("/sys/module/xradio_wlan", F_OK) == 0);
 
-    if (booting && g_setting.speed.skip_wifi_stop && !driver_loaded)
+    if (booting && g_setting.speed.skip_wifi_stop && !driver_loaded) {
         LOGI("wifi: stop skipped at start-up, driver not loaded");
-    else
+        system_exec("killall dropbear rtspLive hostapd udhcpd >/dev/null 2>&1");
+    } else {
         system_script(WIFI_OFF);
+    }
     page_wifi_update_services();
 
     // Activate WiFi interface

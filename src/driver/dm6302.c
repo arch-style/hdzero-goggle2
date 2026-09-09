@@ -26,12 +26,18 @@
 static pthread_mutex_t spi_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // The burst is a single ioctl carrying every register write of the sequence;
-// the driver sends them with a repeated START between. On the goggles it is
-// refused once per init, always around the same point, and works before and
-// after: most likely the bridge is still shifting the previous SPI command
-// out when the next burst arrives with no gap. So a refusal is retried once
-// after a pause and then that one sequence is redone a register at a time.
-// Only a run of refusals disables the burst for the session.
+// the driver sends them with a repeated START between. On the goggles a
+// refusal shows up at most once per init and not in every init, and the
+// writes either side of it succeed, so it reads as a transient rather than a
+// register the bridge dislikes -- most likely it is still shifting the
+// previous SPI command out when the next burst arrives with no gap. So a
+// refusal is retried once after a pause and then that one sequence is redone
+// a register at a time. Only a run of refusals disables the burst for good.
+//
+// Retrying is safe because every attempt writes byte-identical values and
+// nothing reached this way is a FIFO or a write-to-clear: DM6302_M0()
+// addresses each word explicitly and the EFUSE/DCOC strobes are level
+// writes. A caller that broke either of those would break this.
 #define SPI_BURST_REFUSALS_MAX 20
 #define SPI_BURST_REFUSALS_LOGGED 5
 
@@ -46,7 +52,8 @@ static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t cou
             return true;
 
         usleep(300);
-        if (I2C_Write_Burst(ADDR_FPGA, regs, vals, count) == 0)
+        err = I2C_Write_Burst(ADDR_FPGA, regs, vals, count);
+        if (err == 0)
             return true;
 
         spi_burst_refusals++;
@@ -1708,17 +1715,24 @@ void DM6302_DCOC(uint8_t SEL6302) {
     SPI_Write(SEL6302, 0x3, 0x4D4, 0x066727CC); // 0x066427CC
 }
 
+// The init raises the main I2C bus to 1MHz for its duration. Under the bus
+// lock so no transfer is in flight on it; with the init on a worker the OLED
+// and display set-up share that bus at the time.
+#define DM6302_BUS_1MHZ   "aww 0x05002814 0x00000008"
+#define DM6302_BUS_200KHZ "aww 0x05002814 0x00000058"
+
+static void dm6302_bus_speed(const char *cmd) {
+    i2c_bus_lock(2);
+    system_exec(cmd);
+    i2c_bus_unlock(2);
+}
+
 // DM6302 init
 int DM6302_init(uint8_t freq, uint8_t bw) {
     int to_cnt = 0;
     uint32_t r0 = 1, r1 = 1;
 
-    // The bus clock is changed under the bus lock so no transfer is in flight
-    // on it; with the init on a worker the OLED and display set-up share the
-    // bus at the time.
-    i2c_bus_lock(2);
-    system_exec("aww 0x05002814 0x00000008"); // set i2c speed to 1MHz
-    i2c_bus_unlock(2);
+    dm6302_bus_speed(DM6302_BUS_1MHZ);
 
     while (r0) {
         DM5680_ResetRF(0);
@@ -1738,6 +1752,10 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
         to_cnt++;
         if (to_cnt >= 10) {
             LOGE("Error: DM6302s have no response.");
+            // Back to 200kHz before giving up. This return used to leave the
+            // bus at 1MHz for the rest of the session, and with the init on a
+            // worker that window now covers the boot display bring-up too.
+            dm6302_bus_speed(DM6302_BUS_200KHZ);
             return 1;
         }
     }
@@ -1805,9 +1823,7 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     DM6302_M0();
     LOGI("M0 done");
 
-    i2c_bus_lock(2);
-    system_exec("aww 0x05002814 0x00000058"); // set i2c speed to 200KHz
-    i2c_bus_unlock(2);
+    dm6302_bus_speed(DM6302_BUS_200KHZ);
 
     // Recorded, never judged. Checking 0x6/0xFF0 for 0x18 here was wrong:
     // DM6302_M0() writes zero to that register on its first line to load the

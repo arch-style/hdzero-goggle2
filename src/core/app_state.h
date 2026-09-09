@@ -41,6 +41,10 @@ void app_switch_to_analog();
 void app_switch_to_av_in();
 void app_switch_to_hdmi_in();
 void app_switch_to_hdzero(bool is_default);
+// Begin the display timing change the next HDZero switch will want, in the
+// background. Called from the switch itself, and at start-up by Early Video
+// Timing so dispw runs during the UI build instead of after it.
+void start_display_timing_early(void);
 
 #ifdef __cplusplus
 }

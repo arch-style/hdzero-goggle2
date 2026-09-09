@@ -229,13 +229,32 @@ int main(int argc, char *argv[]) {
     hw_stat_init();
     device_init();
 
-    // The tuner init is 1.8s and the UI phase below is about 1.1s, on
-    // different buses apart from the FPGA. After device_init() so that
-    // TP2825_Config() is done before the init raises the bus clock, and only
-    // when start-up is heading straight to HDZero video, since that is the
-    // one path that needs the tuner before the threads run.
+    LOGI("hw: GOGGLE_VER_2=%d revision=%d", GOGGLE_VER_2, (int)getHwRevision());
+
+    // The tuner init is 1.1-1.8s and the UI phase below is about 1.1s. They
+    // share the main I2C bus, which is why the per-port lock is a turnstile
+    // and why the init's 1MHz applies to the display bring-up as well. After
+    // device_init() so TP2825_Config() is done before that clock goes up, and
+    // only when start-up is heading straight to HDZero video, since that is
+    // the one path that needs the tuner before the threads run.
     if (g_setting.speed.async_tuner && boot_goes_to_hdzero_video())
         HDZero_open_async_start(g_setting.source.hdzero_bw);
+
+    // dispw is 1.1s and, with the tuner out of the way, it is the only thing
+    // the switch still waits for. Started here it runs out during the UI
+    // build instead of after it. Skip Display Setup is required or
+    // Display_UI_init() below runs a second dispw for the menu's own timing
+    // and the switch a third; Skip Boot Menu is required because the panel
+    // then stays dark until the video arrives rather than being lit halfway
+    // through the reconfiguration.
+    if (g_setting.speed.boot_display_early && boot_goes_to_hdzero_video()) {
+        if (g_setting.speed.async_display && g_setting.speed.boot_display &&
+            g_setting.speed.skip_boot_menu)
+            start_display_timing_early();
+        else
+            LOGW("vdpo: Early Video Timing needs Async Display Setup, "
+                 "Skip Display Setup and Skip Boot Menu; not starting early");
+    }
 
     esp32_init();
     elrs_init();
@@ -299,6 +318,11 @@ int main(int argc, char *argv[]) {
 
     // 8. Start threads
     start_running();
+
+    // Every path to a picture collects the background timing change on the
+    // way, but the panel stays dark until something does, so make sure. Costs
+    // nothing when there is nothing outstanding.
+    vdpo_timing_collect();
 
     // One line to compare boots by, since the phases alone have proved
     // misleading: they said deferring the menu was faster while the run as a
