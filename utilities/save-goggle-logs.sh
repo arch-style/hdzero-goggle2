@@ -1,32 +1,50 @@
 #!/bin/sh
 #
-# Copy the goggles' application log off the SD card.
+# Copy goggle application logs into the local archive.
 #
-# The goggles keep two boots: HDZGOGGLE.log is the last one and
-# HDZGOGGLE.prev.log the one before, and every power-on pushes the older of
-# the two off the end. Anything worth reading twice -- a slow boot, a session
-# that produced a bad recording -- is therefore one boot away from being gone.
-# This branch is judged from those logs, so they are worth keeping.
+#   utilities/save-goggle-logs.sh [source] [destination]
 #
-#   utilities/save-goggle-logs.sh [card] [destination]
+# source        an SD card or any directory holding HDZGOGGLE*.log files
+#               (default /Volumes/NO NAME), or a single log file -- somebody
+#               else's, sent by mail. Its name becomes part of the archive
+#               name, so rename it to something that says whose it is first.
+# destination   default logs/ in the checkout, which is not tracked.
 #
-# Defaults to the card at /Volumes/NO NAME and to logs/ in the checkout, which
-# is not tracked. A log already in the archive is recognised by its checksum
-# and skipped, so running this twice on the same card costs nothing and
-# plugging the card in between boots is always safe.
+# The goggles keep this boot and the nine before it (HDZGOGGLE.log, then
+# HDZGOGGLE.1.log to HDZGOGGLE.9.log, newest first). Ten boots is a lot of
+# room to notice something and go and get the card, but it is not unlimited:
+# what is on the card is a queue, and this is what takes things out of it.
 #
-# Names are <archive date>-boot<total>ms-<checksum>.log.gz. The date is this
-# machine's, because the goggles have no RTC battery and restore the same
-# fake time every boot; the boot total is from the log itself, so the boot
-# that took ten seconds can be found by name.
+# A log already in the archive is recognised by its checksum and skipped, so
+# running this on the same card twice costs nothing, and running it every time
+# the card is in the machine is the point -- the boot worth keeping is always
+# identified after the fact.
+#
+# Names are <archive date>-[label-]boot<total>ms-<checksum>.log.gz. The date is
+# this machine's: the goggles have no RTC battery and restore the same fake
+# time every boot, so their own timestamps sort nothing. The boot total is read
+# out of the log, so the boot that took ten seconds can be found by name.
 
 set -e
 
-CARD=${1:-/Volumes/NO NAME}
+SRC=${1:-/Volumes/NO NAME}
 DEST=${2:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/logs}
 
-if [ ! -d "$CARD" ]; then
-    echo "no card at $CARD" >&2
+if [ -f "$SRC" ]; then
+    files=$SRC
+    label=$(basename "$SRC" | sed 's/\.log$//; s/[^A-Za-z0-9._-]/_/g')-
+elif [ -d "$SRC" ]; then
+    # Newest first, which is also the order they will be read in.
+    files=$(ls "$SRC"/HDZGOGGLE.log "$SRC"/HDZGOGGLE.[0-9].log \
+               "$SRC"/HDZGOGGLE.prev.log 2>/dev/null || true)
+    label=
+else
+    echo "no card, directory or file at $SRC" >&2
+    exit 1
+fi
+
+if [ -z "$files" ]; then
+    echo "no HDZGOGGLE logs in $SRC" >&2
     exit 1
 fi
 
@@ -35,8 +53,7 @@ mkdir -p "$DEST"
 saved=0
 skipped=0
 
-for name in HDZGOGGLE.log HDZGOGGLE.prev.log; do
-    src="$CARD/$name"
+for src in $files; do
     [ -s "$src" ] || continue
 
     sum=$(shasum -a 1 "$src" | cut -c1-8)
@@ -50,10 +67,15 @@ for name in HDZGOGGLE.log HDZGOGGLE.prev.log; do
            tail -1 | grep -o '[0-9]*' || true)
     [ -n "$boot" ] || boot=unknown
 
-    out="$DEST/$(date +%Y-%m-%d_%H%M)-boot${boot}ms-$sum.log.gz"
+    # Written by the app as its first line. Missing on logs from before that,
+    # and on logs from stock firmware.
+    build=$(grep -m1 -o 'build: .*' "$src" || echo "build: not stated")
+
+    out="$DEST/$(date +%Y-%m-%d_%H%M)-${label}boot${boot}ms-$sum.log.gz"
     gzip -c "$src" > "$out"
     saved=$((saved + 1))
-    echo "saved $(basename "$out") ($(wc -c < "$src" | tr -d ' ') bytes from $name)"
+    echo "saved $(basename "$out")"
+    echo "      $(wc -c < "$src" | tr -d ' ') bytes from $(basename "$src"), $build"
 done
 
 echo "$saved saved, $skipped already had"

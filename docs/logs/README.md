@@ -13,8 +13,8 @@
 
 ## 全部のログ
 
-ゴーグルは 2 回分しか持たない (`HDZGOGGLE.log` と `HDZGOGGLE.prev.log`)。電源を
-入れるたびに古い方が消えるので、カードを PC に挿したら
+ゴーグルは 10 回分持つ (`HDZGOGGLE.log` と `HDZGOGGLE.1.log`〜`.9.log`)。それでも
+有限なので、カードを PC に挿したら
 
 ```sh
 utilities/save-goggle-logs.sh
@@ -22,3 +22,7 @@ utilities/save-goggle-logs.sh
 
 を実行する。チェックサムで重複を弾くので、何度実行しても増えない。保存先は
 `logs/` (git 管理外)。あとから文書で引用することになったものを、ここへ移す。
+
+他人のログは `utilities/save-goggle-logs.sh <ファイル>` で取り込む。ファイル名が
+そのまま保存名のラベルになるので、誰のものか分かる名前にしてから渡すとよい。
+ログの 1 行目 (`build: ...`) がどのバイナリの出力かを示す。

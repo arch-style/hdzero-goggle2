@@ -24,5 +24,12 @@
 #define NO_DIAL_FILE      "/mnt/extsd/no_dial.txt"
 #define APP_LOG_FILE      "/mnt/extsd/HDZGOGGLE.log"
 #define APP_LOG_FILE_PREV "/mnt/extsd/HDZGOGGLE.prev.log"
+// Older boots, newest first: HDZGOGGLE.1.log is the boot before this one.
+#define APP_LOG_FILE_OLD  "/mnt/extsd/HDZGOGGLE.%d.log"
+// How many of those to keep. Two -- this boot and the one before -- meant a
+// log was one power-on away from being gone, and the interesting boot is
+// always identified after the fact. Ten of them is about a megabyte, which is
+// a second of recording on a card that holds sixteen hours.
+#define APP_LOG_KEEP      10
 #define APP_BIN_FILE      "/mnt/extsd/HDZGOGGLE"
 #define DEVELOP_SCRIPT    "/mnt/extsd/develop.sh"

@@ -234,17 +234,59 @@ void lvgl_init() {
 // heavier than video, and with the menu scaled to fit 720p every change
 // inside it is rendered into a layer and then resampled, so log the passes
 // that run long rather than guessing which part is slow.
+//
+// A line per slow pass was the first form of this, and with the menu scaled
+// *every* pass is slow: 1985 lines and 143KB of a 305KB log, all of them
+// saying 27ms. What the number is read for is how bad it gets and how much of
+// the time, so report that instead, once per window, and say nothing at all
+// while nothing is slow.
+#define UI_DRAW_SLOW_MS   20
+#define UI_DRAW_REPORT_MS 5000
+
 static void ui_draw_timed(void) {
+    static uint32_t window_ms = 0;
+    static uint32_t window_passes = 0;
+    static uint32_t slow_passes = 0;
+    static uint32_t slow_worst = 0;
+
     uint32_t t0 = time_ms();
 
     lv_timer_handler();
 
     uint32_t dt = time_ms() - t0;
-    if (dt >= 20)
-        LOGI("ui: draw %ums", dt);
+
+    if (window_ms == 0)
+        window_ms = t0;
+
+    window_passes++;
+
+    if (dt >= UI_DRAW_SLOW_MS) {
+        slow_passes++;
+        if (dt > slow_worst)
+            slow_worst = dt;
+    }
+
+    if (t0 - window_ms >= UI_DRAW_REPORT_MS) {
+        if (slow_passes)
+            LOGI("ui: %u of %u draws over %ums in %ums, worst %ums",
+                 slow_passes, window_passes, UI_DRAW_SLOW_MS,
+                 t0 - window_ms, slow_worst);
+
+        window_ms = t0;
+        window_passes = 0;
+        slow_passes = 0;
+        slow_worst = 0;
+    }
 }
 
 int main(int argc, char *argv[]) {
+    // First line of every log. Everything below it is read against a
+    // particular binary -- which toggles exist, which bugs are fixed, which
+    // measurements are comparable -- and a log with no build in it is a log
+    // that has to be dated by guesswork. Kept to one line and one format so
+    // it can be grepped out of somebody else's file.
+    LOGI("build: %s-%s, %s %s", APP_BASE_VERSION, APP_BUILD_ID, __DATE__, __TIME__);
+
     // Anchored here so the total covers everything, device_init() included.
     // Started after that, it missed the very work Async Motion Sensor moves
     // and reported a 169ms change for what was really 641ms.

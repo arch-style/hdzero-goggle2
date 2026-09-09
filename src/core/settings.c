@@ -420,6 +420,33 @@ void settings_init(void) {
         settings_reset();
 }
 
+// The log is started fresh at every boot, so keeping the older ones is the
+// only way to compare two -- and with one kept, catching the card between the
+// boot that mattered and the next one was the whole job. Keep APP_LOG_KEEP of
+// them, oldest dropped off the end: renames on the FAT card, no copying.
+static void app_log_rotate(void) {
+    char from[64], to[64];
+
+    // Once, on the first boot after the two-file scheme: the file it left is
+    // the boot before the one about to become .1, and .1 is free to say so.
+    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, 1);
+    if (!fs_file_exists(to))
+        rename(APP_LOG_FILE_PREV, to);
+
+    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, APP_LOG_KEEP);
+    unlink(to);
+
+    for (int i = APP_LOG_KEEP - 1; i >= 1; i--) {
+        snprintf(from, sizeof(from), APP_LOG_FILE_OLD, i);
+        snprintf(to, sizeof(to), APP_LOG_FILE_OLD, i + 1);
+        rename(from, to); // nothing there yet is not an error
+    }
+
+    snprintf(to, sizeof(to), APP_LOG_FILE_OLD, 1);
+    rename(APP_LOG_FILE, to);
+    unlink(APP_LOG_FILE);
+}
+
 void settings_load(void) {
     // scan
     g_setting.scan.channel = ini_getl("scan", "channel", g_setting_defaults.scan.channel, SETTING_INI);
@@ -659,10 +686,7 @@ void settings_load(void) {
             g_setting.storage.selftest = true;
         }
     } else if (g_setting.storage.logging) {
-        // The log is wiped at every start, so comparing two boots means
-        // catching the card in between. Keep the one before as .prev.
-        rename(APP_LOG_FILE, APP_LOG_FILE_PREV);
-        unlink(APP_LOG_FILE);
+        app_log_rotate();
         g_setting.storage.logging = log_file_open(APP_LOG_FILE);
     }
 }
