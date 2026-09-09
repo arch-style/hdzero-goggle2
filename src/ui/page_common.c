@@ -66,6 +66,8 @@ void create_select_item(panel_arr_t *arr, lv_obj_t *parent, int count) {
     if (count < 1)
         count = 1;
 
+    arr->count = count;
+
     for (i = 0; i < count; ++i) {
         arr->panel[i] = lv_obj_create(parent);
         lv_obj_clear_flag(arr->panel[i], LV_OBJ_FLAG_SCROLLABLE);
@@ -78,11 +80,11 @@ void create_select_item(panel_arr_t *arr, lv_obj_t *parent, int count) {
 }
 void set_select_item(const panel_arr_t *arr, int row) {
     int i;
-    for (i = 0; i < MAX_PANELS; ++i) {
+    for (i = 0; i < arr->count; ++i) {
         lv_obj_add_flag(arr->panel[i], LV_OBJ_FLAG_HIDDEN);
     }
 
-    if (row >= 0 && row < MAX_PANELS) {
+    if (row >= 0 && row < arr->count) {
         lv_obj_clear_flag(arr->panel[row], LV_OBJ_FLAG_HIDDEN);
     }
 }

@@ -123,6 +123,10 @@ typedef struct {
     lv_obj_t *panel[MAX_PANELS];
     int cur;
     int max;
+    // How many of panel[] create_select_item() actually built. The rest are
+    // NULL, and LVGL is built with LV_USE_ASSERT_OBJ off, so anything that
+    // walks the array has to stop here rather than at MAX_PANELS.
+    int count;
 } panel_arr_t;
 
 struct menu_obj_s {

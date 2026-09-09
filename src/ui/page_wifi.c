@@ -430,7 +430,7 @@ static int page_wifi_get_current_page_max() {
  * Update UI to reflect current wifi page options.
  */
 static void page_wifi_update_current_page(int which) {
-    for (size_t i = 0; i < MAX_PANELS; i++) {
+    for (int i = 0; i < pp_wifi.p_arr.count; i++) {
         lv_obj_add_flag(pp_wifi.p_arr.panel[i], FLAG_SELECTABLE);
     }
 
