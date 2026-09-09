@@ -15,6 +15,7 @@
 #include "lang/language.h"
 #include "ui/page_analog_rssi.h"
 #include "ui/page_autoscan.h"
+#include "ui/page_boot_speed.h"
 #include "ui/page_bugfix.h"
 #include "ui/page_clock.h"
 #include "ui/page_common.h"
@@ -25,8 +26,8 @@
 #include "ui/page_headtracker.h"
 #include "ui/page_imagesettings.h"
 #include "ui/page_input.h"
+#include "ui/page_input_feel.h"
 #include "ui/page_osd.h"
-#include "ui/page_performance.h"
 #include "ui/page_playback.h"
 #include "ui/page_power.h"
 #include "ui/page_record.h"
@@ -34,6 +35,7 @@
 #include "ui/page_sleep.h"
 #include "ui/page_source.h"
 #include "ui/page_storage.h"
+#include "ui/page_switch_speed.h"
 #include "ui/page_version.h"
 #include "ui/page_wifi.h"
 #include "ui/ui_image_setting.h"
@@ -79,14 +81,18 @@ static page_pack_t *page_packs[] = {
 
     // --- second page ---
     &pp_favorites,
-    &pp_performance,
+    &pp_boot_speed,
+    &pp_switch_speed,
+    &pp_input_feel,
     &pp_bugfix,
 };
 
 #define PAGE_COUNT (ARRAY_SIZE(page_packs))
 
-// Entries belonging to the stock first page.
-#define MENU_STOCK_COUNT (PAGE_COUNT - 3)
+// Entries belonging to the stock first page. The rest are this fork's, and
+// there is room on their page for a good many more: the sidebar is sized for
+// the nineteen the stock menu has.
+#define MENU_STOCK_COUNT (PAGE_COUNT - 5)
 
 // The sidebar fills the menu, which starts below the status bar.
 #define MENU_POS_Y          96
