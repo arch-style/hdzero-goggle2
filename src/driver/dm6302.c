@@ -4,10 +4,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include <log/log.h>
+#include <minIni.h>
 
 #include "../core/common.hh"
 #include "../core/settings.h"
@@ -16,6 +18,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "util/system.h"
+#include "ui/page_common.h"
 #include "util/time.h"
 
 #define WAIT(ms) usleep((ms)*1000)
@@ -1353,6 +1356,69 @@ static void efuse_report(uint8_t SEL6302, const EFUSE_T *e) {
          e->macro.m1.ical, e->macro.m1.rcal, efuse_fingerprint(e));
 }
 
+// The calibration block is burned at the factory, so on one goggle its
+// fingerprint should never change. It did: once in 179 reads at 1.2MHz, with
+// no error anywhere near it, the read went through and the data was wrong.
+// A receiver initialised from that block runs mis-calibrated and nothing says
+// so -- which is what one dead antenna until the next restart looks like.
+//
+// So the fingerprint each chip last agreed on is kept in setting.ini, and a
+// read that disagrees is done again for that chip. A second read matching the
+// stored value proves the first was the corrupt one. A second read matching
+// the first -- the same new value twice -- means the stored value is what was
+// wrong (a corrupt first-ever read, say), and it is replaced. The extra read
+// costs a few hundred milliseconds, and only when something disagreed.
+#define EFUSE_FP_SECTION "tuner"
+
+static const char *efuse_fp_key(uint8_t chip) {
+    return chip == 1 ? "efuse_fp1" : "efuse_fp2";
+}
+
+static uint32_t efuse_known_fp(uint8_t chip) {
+    char buf[16] = "";
+
+    ini_gets(EFUSE_FP_SECTION, efuse_fp_key(chip), "", buf, sizeof(buf), SETTING_INI);
+    return (uint32_t)strtoul(buf, NULL, 16);
+}
+
+static void efuse_store_fp(uint8_t chip, uint32_t fp) {
+    char buf[16];
+
+    snprintf(buf, sizeof(buf), "%08x", fp);
+    ini_puts(EFUSE_FP_SECTION, efuse_fp_key(chip), buf, SETTING_INI);
+}
+
+void DM6302_EFUSE1(uint8_t SEL6302);
+
+static void efuse_verify(uint8_t chip) {
+    const EFUSE_T *e = (chip == 1) ? &efuse0 : &efuse1;
+    uint32_t got = efuse_fingerprint(e);
+    uint32_t known = efuse_known_fp(chip);
+
+    if (known == 0) {
+        efuse_store_fp(chip, got);
+        LOGI("EFUSE1 %d: fingerprint %08x recorded as this goggle's", chip, got);
+        return;
+    }
+
+    if (got == known)
+        return;
+
+    LOGE("EFUSE1 %d: fingerprint %08x, this goggle's is %08x -- reading again", chip, got, known);
+    DM6302_EFUSE1(chip);
+
+    uint32_t again = efuse_fingerprint(e);
+
+    if (again == known) {
+        LOGE("EFUSE1 %d: second read matches, the first was a corrupt read", chip);
+    } else if (again == got) {
+        LOGE("EFUSE1 %d: the same new value twice, %08x replaces the stored one", chip, again);
+        efuse_store_fp(chip, again);
+    } else {
+        LOGE("EFUSE1 %d: three different values (%08x stored, %08x, %08x), keeping the last", chip, known, got, again);
+    }
+}
+
 void DM6302_EFUSE1(uint8_t SEL6302) {
     int i, j;
     uint32_t r0, r1, rdat_sel;
@@ -2010,6 +2076,10 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
         DM6302_EFUSE1(2);
         LOGI("EFUSE1 2 done");
     }
+
+    // Before anything is configured from the block.
+    efuse_verify(1);
+    efuse_verify(2);
 
     DM6302_Init1(0, bw);
     LOGI("Init1 done");

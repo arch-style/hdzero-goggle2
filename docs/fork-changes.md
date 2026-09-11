@@ -34,6 +34,7 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 | ログの時刻計測を単調時計に (`eb6f3f6`) | ログの数値が変わるだけ |
 | 範囲外チャンネルのクランプ (`45dff4d`) | 壊れた設定ファイルを弾くだけ |
 | 選択パネルを行数分だけ作る (`c949f31`) | UI は完全に同一、菜単構築が軽くなるだけ |
+| チューナ校正値の照合 | 読んだ校正値の指紋を `setting.ini` の既知値と照合し、違えば読み直す。一致している限り何もしない。1.2MHz で 179 回に 1 回、エラー無しで化けた読み出しが実測されたため |
 
 いずれも単独コミットなので `git revert` 一発で戻せる。
 
@@ -521,3 +522,5 @@ build: 9.5.1-favorites-v1-96-gaa0e504, Sep 10 2026 02:11
 | `i2c: TWI2 CCR as the kernel left it 0x.. = ..kHz, duty bit ...` | メイン I2C バスのクロックレジスタの既定値と、duty ビットの実在 |
 | `twi: tuner bus ... (CCR 0x..)` | チューナ初期化で実際に書いたバス速度 |
 | `SPI: burst took Nms` / `SPI: burst refused` | 規格外速度で FPGA が落とした転送 |
+| `EFUSE1 n: fingerprint … recorded as this goggle's` | 初回のみ。校正値の指紋を保存した |
+| `EFUSE1 n: fingerprint …, this goggle's is … -- reading again` | 校正値の読み出しが化けた。読み直しの結果が次の行に出る |
