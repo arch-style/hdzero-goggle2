@@ -126,6 +126,8 @@ const setting_t g_setting_defaults = {
         .menu_antialias_off = false,
         .async_tuner = false,
         .spi_burst = false,
+        .tuner_bus = 0,
+        .tuner_bus_duty40 = false,
         .skip_wifi_stop = false,
         .boot_display_early = false,
         .defer_menu = false,
@@ -685,6 +687,10 @@ void settings_load(void) {
     g_setting.speed.async_tuner = settings_get_bool("speed", "async_tuner", g_setting_defaults.speed.async_tuner);
     g_setting.speed.spi_burst = settings_get_bool("speed", "spi_burst", g_setting_defaults.speed.spi_burst);
     g_setting.speed.skip_wifi_stop = settings_get_bool("speed", "skip_wifi_stop", g_setting_defaults.speed.skip_wifi_stop);
+    g_setting.speed.tuner_bus = ini_getl("speed", "tuner_bus", g_setting_defaults.speed.tuner_bus, SETTING_INI);
+    if (g_setting.speed.tuner_bus > 2)
+        g_setting.speed.tuner_bus = 0;
+    g_setting.speed.tuner_bus_duty40 = settings_get_bool("speed", "tuner_bus_duty40", g_setting_defaults.speed.tuner_bus_duty40);
     g_setting.speed.boot_display_early = settings_get_bool("speed", "boot_display_early", g_setting_defaults.speed.boot_display_early);
     g_setting.speed.defer_menu = settings_get_bool("speed", "defer_menu", g_setting_defaults.speed.defer_menu);
     g_setting.speed.fast_efuse = settings_get_bool("speed", "fast_efuse", g_setting_defaults.speed.fast_efuse);
@@ -726,6 +732,9 @@ void settings_load(void) {
          g_setting.speed.async_tuner ? "on" : "off",
          g_setting.speed.spi_burst ? "on" : "off",
          g_setting.speed.skip_wifi_stop ? "on" : "off");
+    LOGI("speed: tuner_bus=%s tuner_bus_duty40=%s",
+         (const char *[]){"1.2MHz", "800kHz", "200kHz"}[g_setting.speed.tuner_bus],
+         g_setting.speed.tuner_bus_duty40 ? "on" : "off");
     LOGI("speed: boot_display_early=%s defer_menu=%s fast_efuse=%s dvr_stop_wait=%s dvr_start_wait=%s menu_async_display=%s dvr_defer_stop=%s",
          g_setting.speed.boot_display_early ? "on" : "off",
          g_setting.speed.defer_menu ? "on" : "off",

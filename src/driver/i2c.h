@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stdint.h>
 
 void iic_init();
@@ -23,6 +24,16 @@ int i2c_write_burst(int port, uint8_t slave_address, const uint8_t *regs, const 
 // bus's clock with no transfer in flight on it.
 void i2c_bus_lock(int port);
 void i2c_bus_unlock(int port);
+
+// Port 2 is TWI2, and this is its clock register (TWI_CCR): bits 2:0 CLK_N,
+// 6:3 CLK_M, SCL = 24MHz / (2^N * (M+1) * 10). On the H616-era TWI bit 7 is
+// CLK_DUTY (1 = 40% high, the reset default there); on the A10/H3-era TWI
+// the bit does not exist. Which of the two this SoC is gets probed at
+// iic_init(), because nobody has published the V5's manual.
+#define TWI2_CCR_ADDR 0x05002814
+#define TWI_CCR_DUTY40 0x80
+extern uint32_t g_twi2_ccr_default; // as the kernel left it, before anything else
+extern bool g_twi2_ccr_has_duty;    // bit 7 reads back after being written
 
 #define BMI_I2C_WRITE(addr, val, len) i2c_write_n(1, 0x68, addr, val, len)
 #define BMI_I2C_READ(addr, val, len)  i2c_read_n(1, 0x68, addr, val, len)

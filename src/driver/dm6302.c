@@ -1903,16 +1903,60 @@ void DM6302_DCOC(uint8_t SEL6302) {
     SPI_Write(SEL6302, 0x3, 0x4D4, 0x066727CC); // 0x066427CC
 }
 
-// The init raises the main I2C bus to 1MHz for its duration. Under the bus
-// lock so no transfer is in flight on it; with the init on a worker the OLED
-// and display set-up share that bus at the time.
-#define DM6302_BUS_1MHZ   "aww 0x05002814 0x00000008"
-#define DM6302_BUS_200KHZ "aww 0x05002814 0x00000058"
+// The init runs the main I2C bus faster for its duration. Stock wrote 0x08,
+// which its comment calls 1MHz: SCL = 24MHz / ((M+1) * 10) with M=1 is
+// 1.2MHz, above the I2C ceiling, and the FPGA has been measured not keeping
+// up with it. The choice is a setting now, so the values can be compared on
+// the goggles rather than argued about: 0x10 is 800kHz, the fastest inside
+// the spec, and "200k" means not touching the register at all, which is what
+// upstream has done since 9.6.
+//
+// Written under the bus lock so no transfer is in flight on it; with the
+// init on a worker the OLED and display set-up share that bus at the time.
+#define TWI_CCR_1200K 0x08
+#define TWI_CCR_800K  0x10
+#define TWI_CCR_200K  0x58
 
-static void dm6302_bus_speed(const char *cmd) {
+enum { TUNER_BUS_1200K = 0, TUNER_BUS_800K, TUNER_BUS_NONE };
+
+static uint32_t tuner_bus_duty(void) {
+    return (g_setting.speed.tuner_bus_duty40 && g_twi2_ccr_has_duty) ? TWI_CCR_DUTY40 : 0;
+}
+
+static void dm6302_bus_write(uint32_t ccr) {
+    char cmd[48];
+
+    snprintf(cmd, sizeof(cmd), "aww 0x%08x 0x%08x", TWI2_CCR_ADDR, ccr);
     i2c_bus_lock(2);
     system_exec(cmd);
     i2c_bus_unlock(2);
+}
+
+static void dm6302_bus_fast(void) {
+    static const char *name[] = {"1.2MHz", "800kHz"};
+    uint8_t mode = g_setting.speed.tuner_bus;
+
+    if (mode == TUNER_BUS_NONE) {
+        LOGI("twi: tuner init at the bus's own clock (CCR 0x%02x)", g_twi2_ccr_default & 0xFF);
+        return;
+    }
+
+    if (g_setting.speed.tuner_bus_duty40 && !g_twi2_ccr_has_duty)
+        LOGE("twi: 40%% duty asked for, but this SoC has no duty bit");
+
+    uint32_t ccr = (mode == TUNER_BUS_800K ? TWI_CCR_800K : TWI_CCR_1200K) | tuner_bus_duty();
+    LOGI("twi: tuner bus %s%s (CCR 0x%02x)", name[mode], tuner_bus_duty() ? ", 40% duty" : "", ccr);
+    dm6302_bus_write(ccr);
+}
+
+// Back to 200kHz. Stock wrote 0x58 here, which on a SoC with the duty bit
+// also clears it -- so the bus ran at 50% duty for the rest of the session
+// even if the kernel had set 40%. With the duty switch on, the bit is kept.
+static void dm6302_bus_normal(void) {
+    if (g_setting.speed.tuner_bus == TUNER_BUS_NONE)
+        return;
+
+    dm6302_bus_write(TWI_CCR_200K | tuner_bus_duty());
 }
 
 // DM6302 init
@@ -1920,7 +1964,7 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     int to_cnt = 0;
     uint32_t r0 = 1, r1 = 1;
 
-    dm6302_bus_speed(DM6302_BUS_1MHZ);
+    dm6302_bus_fast();
 
     while (r0) {
         DM5680_ResetRF(0);
@@ -1943,7 +1987,7 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
             // Back to 200kHz before giving up. This return used to leave the
             // bus at 1MHz for the rest of the session, and with the init on a
             // worker that window now covers the boot display bring-up too.
-            dm6302_bus_speed(DM6302_BUS_200KHZ);
+            dm6302_bus_normal();
             return 1;
         }
     }
@@ -2016,7 +2060,7 @@ int DM6302_init(uint8_t freq, uint8_t bw) {
     DM6302_M0();
     LOGI("M0 done");
 
-    dm6302_bus_speed(DM6302_BUS_200KHZ);
+    dm6302_bus_normal();
 
     // Recorded, never judged. Checking 0x6/0xFF0 for 0x18 here was wrong:
     // DM6302_M0() writes zero to that register on its first line to load the

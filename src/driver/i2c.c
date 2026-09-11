@@ -18,6 +18,7 @@
 
 #include "../core/common.hh"
 #include "core/settings.h"
+#include "util/system.h"
 #include "util/time.h"
 
 #define IIC_PORTS 4
@@ -114,11 +115,46 @@ bool iic_is_port_ready(int port) {
     return true;
 }
 
+uint32_t g_twi2_ccr_default = 0;
+bool g_twi2_ccr_has_duty = false;
+
+// Nothing has touched the bus yet, so read the clock register the kernel set
+// up, flip bit 7, read it back, and put the original back: a bit that sticks
+// exists. Two register reads and two writes through awr/aww, a few tens of
+// ms, once. This is the first fact about the bus that comes from the goggles
+// rather than from another SoC's manual.
+static void twi2_probe(void) {
+    uint32_t def, back;
+    char cmd[48];
+
+    if (!reg_read(TWI2_CCR_ADDR, &def)) {
+        LOGE("i2c: TWI2 CCR could not be read (no awr?)");
+        return;
+    }
+
+    g_twi2_ccr_default = def;
+
+    snprintf(cmd, sizeof(cmd), "aww 0x%08x 0x%08x", TWI2_CCR_ADDR, def ^ TWI_CCR_DUTY40);
+    system(cmd);
+    if (reg_read(TWI2_CCR_ADDR, &back))
+        g_twi2_ccr_has_duty = ((back ^ def) & TWI_CCR_DUTY40) != 0;
+    snprintf(cmd, sizeof(cmd), "aww 0x%08x 0x%08x", TWI2_CCR_ADDR, def);
+    system(cmd);
+
+    unsigned n = def & 7, m = (def >> 3) & 0xF;
+    LOGI("i2c: TWI2 CCR as the kernel left it 0x%02x = %ukHz (N=%u M=%u), duty bit %s%s",
+         def & 0xFF, 24000u / ((1u << n) * (m + 1) * 10), n, m,
+         g_twi2_ccr_has_duty ? "present" : "absent",
+         g_twi2_ccr_has_duty ? ((def & TWI_CCR_DUTY40) ? ", set (40%)" : ", clear (50%)") : "");
+}
+
 void iic_init() {
     for (int i = 0; i < IIC_PORTS; ++i) {
         pthread_mutex_init(&g_iic_locks[i].turnstile, NULL);
         pthread_mutex_init(&g_iic_locks[i].bus, NULL);
     }
+
+    twi2_probe();
 
     // Offset starts with 1 as it is not referenced thus far.
     for (int i = 1; i < IIC_PORTS; ++i) {

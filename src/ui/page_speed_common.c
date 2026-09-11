@@ -46,6 +46,16 @@ void speed_toggle(speed_page_t *pg, btn_group_t *group, const char *name,
     pg->name[row] = group->label;
 }
 
+void speed_choice(speed_page_t *pg, btn_group_t *group, const char *name,
+                  const char *c0, const char *c1, const char *c2, int value, int row) {
+    create_btn_group_item(group, pg->cont, 3, _lang(name), c0, c1, c2, "", row);
+    btn_group_set_sel(group, value);
+    // An empty figure keeps the row's slot in the arrays without drawing over
+    // the third button.
+    speed_saving(pg, "", row);
+    pg->name[row] = group->label;
+}
+
 void speed_slider(speed_page_t *pg, slider_group_t *slider, int row) {
     lv_obj_set_grid_cell(slider->slider, LV_GRID_ALIGN_STRETCH, 3, 1,
                          LV_GRID_ALIGN_CENTER, row, 1);

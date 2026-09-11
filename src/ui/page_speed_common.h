@@ -58,6 +58,10 @@ void speed_heading(speed_page_t *pg, panel_arr_t *arr, const char *name, int row
 // worth on the right. name and saving are untranslated.
 void speed_toggle(speed_page_t *pg, btn_group_t *group, const char *name,
                   bool value, const char *saving, int row);
+// A row with three named choices and no figure: the third button lands where
+// the figure would go. value is the chosen index.
+void speed_choice(speed_page_t *pg, btn_group_t *group, const char *name,
+                  const char *c0, const char *c1, const char *c2, int value, int row);
 
 // A slider row, moved into the columns the toggles use: create_slider_item()
 // puts its value label in column 5, which these pages have no room for.

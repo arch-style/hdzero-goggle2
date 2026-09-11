@@ -318,6 +318,18 @@ typedef struct {
     // I2C transaction instead of seven. Falls back to seven if the ioctl is
     // refused. Speeds up every DM6302_init() and channel change.
     bool spi_burst;
+    // Which clock the main I2C bus runs at while the tuner is initialised.
+    // Stock raises it from 200kHz to what its comment calls 1MHz and the
+    // divider actually makes 1.2MHz -- over the I2C Fast-mode Plus ceiling,
+    // over Allwinner's own 400kHz for the controller, and where the FPGA has
+    // been measured not keeping up (five second transfers, one antenna dead).
+    // 0 = stock 1.2MHz, 1 = 800kHz, the fastest value inside the spec,
+    // 2 = do not raise it at all, which is what upstream does since 9.6.
+    // Read at each tuner init, so it can be compared without a restart.
+    uint8_t tuner_bus;
+    // Ask for a 40% SCL duty (a longer LOW) during the init instead of 50%.
+    // Only where the SoC has the bit, which iic_init() finds out.
+    bool tuner_bus_duty40;
     // Do not run wlan_stop.sh at start-up when the WiFi driver is not loaded.
     // The script sleeps a second and then kills things that are not running,
     // and it blocks the main loop for 1.08s right after the picture appears.

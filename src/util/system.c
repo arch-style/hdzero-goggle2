@@ -18,6 +18,27 @@ void log_thread_id(const char *name) {
     LOGI("thread: %s is %d", name, (int)syscall(SYS_gettid));
 }
 
+bool reg_read(uint32_t addr, uint32_t *value) {
+    char cmd[48];
+    uint32_t got_addr = 0, got_val = 0;
+
+    snprintf(cmd, sizeof(cmd), "awr 0x%08x 2>/dev/null", addr);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp)
+        return false;
+
+    // awr prints "read 0x05070080:0x00000123"; gpadc.c parses the same line.
+    int n = fscanf(fp, "read 0x%x:0x%x", &got_addr, &got_val);
+    pclose(fp);
+
+    if (n != 2 || got_addr != addr)
+        return false;
+
+    *value = got_val;
+    return true;
+}
+
 // Every one of these forks a shell. On this SoC that is not free, and the
 // menu/video switch path runs several, so log how long each one took.
 //
