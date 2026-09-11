@@ -76,11 +76,18 @@ static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t cou
     if (g_setting.speed.spi_burst && !spi_burst_refused) {
         uint32_t started_ms = time_ms();
         int err = I2C_Write_Burst(ADDR_FPGA, regs, vals, count);
+        uint32_t took_ms = time_ms() - started_ms;
 
         if (err == 0) {
-            spi_burst_took(time_ms() - started_ms);
+            spi_burst_took(took_ms);
             return true;
         }
+
+        // With Short I2C Timeout on, the stall comes back as a failure after
+        // 500ms and the retry below succeeds -- which is the same bus fault
+        // wearing a different return code. It has to count the same way, or
+        // the switch that shortens the damage also hides it from this.
+        spi_burst_took(took_ms);
 
         usleep(300);
         started_ms = time_ms();
