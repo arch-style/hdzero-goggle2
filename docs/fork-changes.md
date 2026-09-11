@@ -518,3 +518,6 @@ build: 9.5.1-favorites-v1-96-gaa0e504, Sep 10 2026 02:11
 | `dvr: record stop left to finish in the background` | Defer DVR Stop が効いている |
 | `menu: zoom N/256 for Npx display` | メニューの縮小率 |
 | `speed: ...=on/off` | 起動時の設定一覧 |
+| `i2c: TWI2 CCR as the kernel left it 0x.. = ..kHz, duty bit ...` | メイン I2C バスのクロックレジスタの既定値と、duty ビットの実在 |
+| `twi: tuner bus ... (CCR 0x..)` | チューナ初期化で実際に書いたバス速度 |
+| `SPI: burst took Nms` / `SPI: burst refused` | 規格外速度で FPGA が落とした転送 |
