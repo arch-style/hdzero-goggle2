@@ -42,34 +42,31 @@ static pthread_mutex_t spi_mutex = PTHREAD_MUTEX_INITIALIZER;
 #define SPI_BURST_REFUSALS_MAX 20
 #define SPI_BURST_REFUSALS_LOGGED 5
 
-// A burst that succeeds after five seconds is the same fault as one that is
-// refused, and worse to live with: the driver reports success, so nothing
-// above notices, while the bus lock is held for all of it and every other
-// thread on the port stops. Measured on the goggles at 5006, 5009 and 5076ms,
-// always this transaction and never a single-register write.
+// A burst that takes hundreds of milliseconds is the bus fault at 1.2MHz
+// showing through: the driver times out, resets and retries, and the bus
+// lock is held for all of it. Measured at 5006ms with the stock timeout and
+// 501-510ms with Short I2C Timeout, always this transaction and never a
+// single-register write.
 //
-// Two of them and the burst goes for the session. What that costs is the
-// 0.6-0.9s a tuner init saves by sending seven registers at once; what it
-// buys is not doing five seconds of nothing in the middle of a switch.
+// The first version of this turned the burst off for the session after two
+// of them. The next session showed what that costs: every init after the
+// second stall took 1450ms instead of 780, for as long as the goggles were
+// on -- 670ms a time to avoid a 500ms stall that hits one init in ten. That
+// is a loss with the short timeout, and at 800kHz the stall never happens at
+// all. So the slow burst is counted and reported, and the burst stays on;
+// the refusal path below still retires a burst the driver will not send.
 #define SPI_BURST_SLOW_MS 500
-#define SPI_BURST_SLOW_MAX 2
 
 static bool spi_burst_refused = false;
 static unsigned spi_burst_refusals = 0;
 static unsigned spi_burst_slow = 0;
 
-// Counted where it succeeded, so the caller carries on with the value written.
 static void spi_burst_took(uint32_t ms) {
     if (ms < SPI_BURST_SLOW_MS)
         return;
 
     spi_burst_slow++;
-    LOGE("SPI: burst took %ums, %u so far", ms, spi_burst_slow);
-
-    if (spi_burst_slow >= SPI_BURST_SLOW_MAX && !spi_burst_refused) {
-        spi_burst_refused = true;
-        LOGE("SPI: burst disabled after %u slow writes", spi_burst_slow);
-    }
+    LOGE("SPI: burst took %ums, %u so far this session", ms, spi_burst_slow);
 }
 
 static bool spi_write_regs(const uint8_t *regs, const uint8_t *vals, uint8_t count) {
@@ -1948,8 +1945,12 @@ static void dm6302_bus_fast(void) {
         return;
     }
 
-    if (g_setting.speed.tuner_bus_duty40 && !g_twi2_ccr_has_duty)
-        LOGE("twi: 40%% duty asked for, but this SoC has no duty bit");
+    static bool duty_complained = false;
+
+    if (g_setting.speed.tuner_bus_duty40 && !g_twi2_ccr_has_duty && !duty_complained) {
+        duty_complained = true;
+        LOGE("twi: 40%% duty asked for, but this SoC has no duty bit; ignoring it");
+    }
 
     uint32_t ccr = (mode == TUNER_BUS_800K ? TWI_CCR_800K : TWI_CCR_1200K) | tuner_bus_duty();
     LOGI("twi: tuner bus %s%s (CCR 0x%02x)", name[mode], tuner_bus_duty() ? ", 40% duty" : "", ccr);
