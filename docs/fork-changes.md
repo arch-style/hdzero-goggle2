@@ -95,6 +95,7 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 | Next channel | 次のチャンネルへ即座に選局する。ダイヤルを 1 つ回して押す操作と同じことを 1 押しで行う |
 | Previous channel | 同じく 1 つ前のチャンネルへ |
 | HDZero Wide/Narrow | HDZero の帯域幅 Wide / Narrow を切り替える (`Source` ページの HDZero BW と同じ設定) |
+| Tuner re-init (debug) | 受信機の初期化 (`DM6302_init()`) だけをその場でやり直す。帯域・チャンネル・表示はそのまま。押すたびに 1 回、映像を見ながら初期化を観察するためのもの。ログに `tuner: re-init took Nms` |
 
 補足:
 

@@ -64,6 +64,7 @@ static const action_t btnActions[] = {
     {.id = 9, .name = "Cycle source", .functionPtr = &source_cycle},
     {.id = 11, .name = "Next channel", .functionPtr = &tune_channel_next},
     {.id = 13, .name = "Previous channel", .functionPtr = &tune_channel_prev},
+    {.id = 14, .name = "Tuner re-init (debug)", .functionPtr = &app_tuner_reinit},
     {.id = 12, .name = "HDZero Wide/Narrow", .functionPtr = &source_toggle_hdzero_bw},
 };
 

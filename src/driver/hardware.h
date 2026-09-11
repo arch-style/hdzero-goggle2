@@ -83,6 +83,8 @@ extern int fhd_req;
 void hw_stat_init();
 
 void OLED_ON(int bON);
+// 0 = UI, 1 = the live source. Reopens the M0 when the tuner is open.
+void Display_VO_SWITCH(uint8_t sel);
 void HDZero_open(int bw);
 void HDZero_Close();
 void HDZero_Standby();

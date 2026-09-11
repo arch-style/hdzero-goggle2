@@ -321,6 +321,41 @@ static void hdzero_recording_side(void) {
     system_script(REC_STOP_LIVE);
 }
 
+// The Wide/Narrow button was the way to run the tuner init on demand, and it
+// is a poor instrument: every other press lands on the bandwidth you did not
+// want, and the init it runs is wrapped in a full source switch. This is the
+// init and nothing else -- the three calls app_switch_to_hdzero() makes for
+// the receivers, on a display that stays where it is.
+void app_tuner_reinit(void) {
+    if (g_source_info.source != SOURCE_HDZERO) {
+        LOGI("tuner: re-init asked for, but the source is not HDZero");
+        return;
+    }
+
+    uint32_t started_ms = time_ms();
+    LOGI("tuner: re-init on request");
+
+    // The receivers go away for the better part of a second, and a recording
+    // still being finalised would take that. Same rule as the Wide/Narrow
+    // button.
+    dvr_cmd(DVR_STOP);
+    if (g_setting.bugfix.wait_for_recording)
+        dvr_collect_stop();
+
+    HDZero_Close();
+    HDZero_open(g_setting.source.hdzero_bw);
+
+    DM6302_SetChannel(g_setting.source.hdzero_band, (g_setting.scan.channel - 1) & 0x7f);
+    DM5680_clear_vldflg();
+    DM5680_req_vldflg();
+
+    // The display never left the HDZero source, but the close took the M0
+    // with it; this is what the display switch does for it on a real switch.
+    Display_VO_SWITCH(1);
+
+    LOGI("tuner: re-init took %ums", time_ms() - started_ms);
+}
+
 void app_switch_to_hdzero(bool is_default) {
     int ch;
     LOGI("switch mark: to_hdzero start");
