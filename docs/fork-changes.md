@@ -73,8 +73,8 @@ HDZero Goggle 2 の純正アプリ (`hd-zero/hdzero-goggle2`) に対する fork 
 | Defer DVR Stop | `dvr_defer_stop` | 停止を待たずに先へ進み、待ちを次の録画開始へ移す |
 | Burst Tuner Writes | `spi_burst` | チューナ 1 回の SPI 書き込み (FPGA レジスタ 7 回) を 1 回の I2C 転送に |
 | Dual-Chip EFUSE Read | `fast_efuse` | 2 チップ分の校正値を 1 回の走査で読む |
-| Tuner Bus | `tuner_bus` | チューナ初期化中のメイン I2C バスの速度。**1.2M**（純正。コメントは「1MHz」だが分周値は 1.2MHz で規格外）/ **800k**（規格内の最速、`0x10`）/ **200k**（バスに触らない。本家 9.6 と同じ）。次のチューナ初期化から効くので再起動不要 |
-| Tuner Bus 40% Duty | `tuner_bus_duty40` | 初期化中の SCL を 40% duty（LOW を長く）にする。**SoC にビット 7 がある場合のみ効く**。起動時に実在を調べ、結果は行の説明文とログ `i2c: TWI2 CCR ...` に出る |
+| Tuner Bus | `tuner_bus` | チューナ初期化中のメイン I2C バスの速度。**1.2M**（純正。コメントは「1MHz」だが分周値は 1.2MHz で規格外）/ **800k**（規格内の最速、`0x10`）/ **200k**（バスに触らない。本家 9.6 と同じ）。次のチューナ初期化から効くので再起動不要。**実測: 800k は初期化 20 回で詰まり 0、1.2M は 41 回で 4 回**（[measurements.md 5](measurements.md)）。推奨 800k、既定は純正の 1.2M |
+| Tuner Bus 40% Duty | `tuner_bus_duty40` | 初期化中の SCL を 40% duty にする。**この SoC（V5）にはビット 7 が無いので何もしない**ことを起動時に確認済み。行の説明文にもそう出る。SoC が違う個体のために残してある |
 | Menu Antialias OFF | `menu_antialias_off` | 縮小表示中のメニューのアンチエイリアスを切る |
 | Skip Idle Redraws | `ui_throttle` + `label_diff` | ステータスバーの更新を 200Hz→20Hz にし、内容が変わらないときは描き直さない |
 | Split UI Lock | `split_lock` | メインループの `lvgl_mutex` を段階ごとに取り直し、入力の割り込む余地を増やす |

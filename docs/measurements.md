@@ -235,7 +235,7 @@ Playback を 720p のまま表示して `dispw` の 1.1 秒 × 2 を消す試み
 
 `Switch Speed → Tuner Bus` を切り替え、Wide/Narrow ボタンで `DM6302_init()` を連続実行。
 1 回の初期化 = `twi: tuner bus …` から `DM6302 after init` まで。`Short I2C Timeout` ON、
-`Burst Tuner Writes` ON、`Dual-Chip EFUSE Read` ON。ログ `logs/2026-09-12_0154-boot2698ms-8779534e.log.gz`。
+`Burst Tuner Writes` ON、`Dual-Chip EFUSE Read` ON。ログ [docs/logs/tuner-bus-800k-vs-1200k.log.gz](logs/tuner-bus-800k-vs-1200k.log.gz)。
 
 | バス速度 | 初期化回数 | 詰まりのあった回 | 詰まり合計 | 正常時の初期化時間 (中央値 / 最小 / 最大) |
 |---|---|---|---|---|
